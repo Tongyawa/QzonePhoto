@@ -1,0 +1,16 @@
+{
+  "target": "123456789",
+  "out": "%USERPROFILE%\\Pictures\\QzonePhoto\\exports\\123456789-llm",
+  "source": "home",
+  "format": "llm",
+  "comments": "full",
+  "skipMedia": false,
+  "noVideo": false,
+  "overwrite": false,
+  "includeUrls": false,
+  "limit": 0,
+  "pageSize": 10,
+  "appData": "%APPDATA%\\qzone-photo",
+  "uin": "",
+  "pSkey": ""
+}

@@ -13,4 +13,8 @@ logs/security/*.key
 # Claude Code 工作区临时文件（截图、抓包等）
 .claude-tmp/
 .claude/scheduled_tasks.lock
+.claude/test-artifacts/local-only/
+/exports/
 /.test/
+/qzone-feed-export.config.local.json
+/scripts/qzone-feed-export.config.local.json
