@@ -1,7 +1,7 @@
 {
   "name": "qzone-photo",
   "version": "2.6.0",
-  "description": "企鹅相册 - QzonePhoto",
+  "description": "企鹅相册 · QzonePhoto",
   "main": "./out/main/index.js",
   "author": "github.com/11273",
   "homepage": "https://qzonephoto.getgit.one",

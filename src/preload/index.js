@@ -268,6 +268,7 @@ try {
       onUpdateAvailable: (callback) => ipcClient.on(IPC_UPDATE.AVAILABLE, callback),
       onUpdateNotAvailable: (callback) => ipcClient.on(IPC_UPDATE.NOT_AVAILABLE, callback),
       onDownloadProgress: (callback) => ipcClient.on(IPC_UPDATE.DOWNLOAD_PROGRESS, callback),
+      onUpdateDownloadFallback: (callback) => ipcClient.on(IPC_UPDATE.DOWNLOAD_FALLBACK, callback),
       onUpdateDownloaded: (callback) => ipcClient.on(IPC_UPDATE.DOWNLOADED, callback),
       onUpdateError: (callback) => ipcClient.on(IPC_UPDATE.ERROR, callback),
 
@@ -277,6 +278,7 @@ try {
         ipcClient.removeAllListeners(IPC_UPDATE.AVAILABLE)
         ipcClient.removeAllListeners(IPC_UPDATE.NOT_AVAILABLE)
         ipcClient.removeAllListeners(IPC_UPDATE.DOWNLOAD_PROGRESS)
+        ipcClient.removeAllListeners(IPC_UPDATE.DOWNLOAD_FALLBACK)
         ipcClient.removeAllListeners(IPC_UPDATE.DOWNLOADED)
         ipcClient.removeAllListeners(IPC_UPDATE.ERROR)
       }

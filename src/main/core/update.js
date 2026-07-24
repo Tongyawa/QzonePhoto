@@ -7,6 +7,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import { APP_DOWNLOAD_PAGE } from '@shared/const'
 import {
+  getGitHubFallbackMode,
   isStableReleaseVersion,
   matchesPinnedUpdateCandidate,
   OFFICIAL_UPDATE_SOURCES,
@@ -34,6 +35,7 @@ export class AutoUpdateManager extends EventEmitter {
       isInitialized: false,
       isDownloading: false,
       isCheckingForUpdate: false,
+      isCheckingFallback: false,
       downloadCancellationToken: null,
       updateSource: 'r2',
       selectedUpdate: null,
@@ -487,14 +489,23 @@ export class AutoUpdateManager extends EventEmitter {
    * 检查更新
    */
   async checkForUpdates() {
+    // electron-updater 在未打包的开发环境不会真正检查更新。提前返回，避免渲染进程
+    // 误以为检查仍在进行；需要调试更新时可显式设置此环境变量。
+    if (!app.isPackaged && process.env.QZONEPHOTO_FORCE_UPDATE_CHECK !== '1') {
+      logger.info('[更新] 开发环境跳过更新检查')
+      return { skipped: true, reason: 'development' }
+    }
+
     if (!this.state.isInitialized) {
       await this.initialize()
     }
 
-    if (this.state.isCheckingForUpdate) {
+    if (this.state.isCheckingForUpdate || this.state.isCheckingFallback) {
       logger.warn('[更新] 正在检查更新中，忽略重复请求')
-      return null
+      return { skipped: true, reason: 'checking' }
     }
+
+    let backgroundFallbackStarted = false
 
     try {
       logger.info('[更新] 开始检查更新', {
@@ -509,40 +520,55 @@ export class AutoUpdateManager extends EventEmitter {
       this.state.suppressUpdateEvents = true
 
       const r2Check = await this.checkUpdateSource('primary')
-      let selected = this.createUpdateCandidate('r2', r2Check.result)
-      let githubCheck = null
+      const r2Candidate = this.createUpdateCandidate('r2', r2Check.result)
+      const fallbackMode = getGitHubFallbackMode(r2Check.result, r2Candidate)
 
-      // R2 有可用的完整更新时不再请求 GitHub。只有 R2 尚未同步或不可用，才启用兜底。
-      if (!selected) {
-        githubCheck = await this.checkUpdateSource('github')
-        selected = this.createUpdateCandidate('github', githubCheck.result)
+      // R2 有可用且完整的更新时，立即结束检查；GitHub 绝不参与抢占。
+      if (fallbackMode === 'skip') {
+        this.state.suppressUpdateEvents = false
+        this.state.suppressSourceError = false
+        this.state.selectedUpdate = r2Candidate
+        this.publishAvailableUpdate(r2Candidate.updateInfo)
+        return this.formatUpdateInfo(r2Candidate.updateInfo)
       }
 
-      if (!selected && !r2Check.result && !githubCheck?.result) {
-        throw r2Check.error || githubCheck?.error || new Error('更新服务暂不可用')
+      // R2 已明确回应“当前稳定版本”，先立刻结束用户可见的检查。
+      // GitHub 只在后台补查，从而支持先发布 GitHub、验证后再同步 R2 的发布流程。
+      if (fallbackMode === 'background') {
+        this.state.suppressUpdateEvents = false
+        this.state.suppressSourceError = false
+        this.publishNoUpdate(r2Check.result.updateInfo)
+        backgroundFallbackStarted = true
+        this.startBackgroundGitHubCheck()
+        return this.formatUpdateInfo(r2Check.result.updateInfo)
+      }
+
+      // R2 没有返回可用元数据时，GitHub 才作为前台兜底源接管检查。
+      const githubCheck = await this.checkUpdateSource('github')
+      const githubCandidate = this.createUpdateCandidate('github', githubCheck.result)
+      if (!githubCandidate && !githubCheck.result) {
+        throw r2Check.error || githubCheck.error || new Error('更新服务暂不可用')
       }
 
       this.state.suppressUpdateEvents = false
       this.state.suppressSourceError = false
-
-      if (selected?.result?.updateInfo) {
-        this.state.selectedUpdate = selected
-        this.publishAvailableUpdate(selected.updateInfo)
-        return this.formatUpdateInfo(selected.updateInfo)
+      if (githubCandidate) {
+        this.state.selectedUpdate = githubCandidate
+        this.publishAvailableUpdate(githubCandidate.updateInfo)
+        return this.formatUpdateInfo(githubCandidate.updateInfo)
       }
 
-      const noUpdateInfo = r2Check?.result?.updateInfo || githubCheck?.result?.updateInfo
-      if (noUpdateInfo) {
-        this.publishNoUpdate(noUpdateInfo)
-        return this.formatUpdateInfo(noUpdateInfo)
-      }
-
-      return null
+      this.publishNoUpdate(githubCheck.result.updateInfo)
+      return this.formatUpdateInfo(githubCheck.result.updateInfo)
     } catch (error) {
       this.state.isCheckingForUpdate = false
       const errorInfo = this.parseError(error)
       throw new Error(errorInfo.message)
     } finally {
+      this.state.isCheckingForUpdate = false
+      if (!backgroundFallbackStarted) {
+        this.state.isCheckingFallback = false
+      }
       this.state.suppressSourceError = false
       this.state.suppressUpdateEvents = false
     }
@@ -558,6 +584,40 @@ export class AutoUpdateManager extends EventEmitter {
       logger.warn(`[更新] ${sourceName} 更新源检查失败:`, error?.message || error)
       return { result: null, error }
     }
+  }
+
+  /**
+   * R2 已确认当前稳定版时，GitHub 只作为非阻塞补查。
+   * 这样用户立即得到 R2 的结果；若稍后发现已经验证的 GitHub 新版，
+   * 再单独提示，而不是让标题栏长期保持“检查中”。
+   */
+  startBackgroundGitHubCheck() {
+    if (this.state.isCheckingFallback) return
+
+    this.state.isCheckingFallback = true
+    queueMicrotask(() => {
+      this.state.suppressSourceError = true
+      this.state.suppressUpdateEvents = true
+
+      void this.checkUpdateSource('github')
+        .then((githubCheck) => {
+          const githubCandidate = this.createUpdateCandidate('github', githubCheck.result)
+          if (!githubCandidate) return
+
+          this.state.selectedUpdate = githubCandidate
+          this.state.suppressUpdateEvents = false
+          this.publishAvailableUpdate(githubCandidate.updateInfo)
+        })
+        .catch((error) => {
+          logger.warn('[更新] GitHub 后台补查失败:', error?.message || error)
+        })
+        .finally(() => {
+          this.state.isCheckingForUpdate = false
+          this.state.isCheckingFallback = false
+          this.state.suppressSourceError = false
+          this.state.suppressUpdateEvents = false
+        })
+    })
   }
 
   createUpdateCandidate(source, result) {
@@ -632,6 +692,9 @@ export class AutoUpdateManager extends EventEmitter {
           '[更新] R2 更新包下载失败，切换 GitHub 兜底:',
           primaryError?.message || primaryError
         )
+        this.sendToRenderer(IPC_UPDATE.DOWNLOAD_FALLBACK, {
+          message: '正在尝试备用下载'
+        })
         this.state.suppressUpdateEvents = true
         const githubCheck = await this.checkUpdateSource('github')
         this.state.suppressUpdateEvents = false
@@ -852,6 +915,7 @@ export class AutoUpdateManager extends EventEmitter {
     return {
       isDownloading: this.state.isDownloading,
       isCheckingForUpdate: this.state.isCheckingForUpdate,
+      isCheckingFallback: this.state.isCheckingFallback,
       progress: this.getDownloadProgress(),
       lastUpdateInfo: this.state.lastUpdateInfo
     }
@@ -909,7 +973,12 @@ export class AutoUpdateManager extends EventEmitter {
         isInitialized: false,
         isDownloading: false,
         isCheckingForUpdate: false,
-        downloadCancellationToken: null
+        isCheckingFallback: false,
+        downloadCancellationToken: null,
+        updateSource: 'r2',
+        selectedUpdate: null,
+        suppressSourceError: false,
+        suppressUpdateEvents: false
       }
 
       logger.info('[更新] AutoUpdateManager 已销毁')

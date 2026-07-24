@@ -1,8 +1,8 @@
 # 应用唯一标识符 (采用反向域名格式)
 appId: com.qzonephoto.app
 
-# 产品名称 (显示在界面/安装包中的名称)
-productName: 企鹅相册 - QzonePhoto
+# 产品名称（桌面图标和安装后的应用名称；保持简短，避免系统快捷方式换行）
+productName: 企鹅相册
 
 # 构建资源配置
 directories:
@@ -74,7 +74,7 @@ linux:
       arch: [x64]
   maintainer: github.com/11273
   category: Utility
-  synopsis: 企鹅相册 - QzonePhoto
+  synopsis: 企鹅相册 · QzonePhoto
   description: 一个简单易用的 QQ 空间相册本地管理与备份工具
 
 # macOS平台配置
@@ -105,7 +105,7 @@ dmg:
 # AppImage配置
 appImage:
   artifactName: QzonePhoto-${version}-${os}-${arch}.${ext} # 命名格式
-  synopsis: 企鹅相册 - QzonePhoto
+  synopsis: 企鹅相册 · QzonePhoto
   category: Utility
 
 # DEB包配置

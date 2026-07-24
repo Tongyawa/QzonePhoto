@@ -40,7 +40,7 @@ const feedHtml = (text, media, topicId) => `
     <span class="qz_btn_reply"><em>6</em></span>
     <span class="qz_retweet_btn"><em>2</em></span>
     <span class="state">浏览 126 次</span>
-    <span class="phone-style">来自 企鹅相册 - QzonePhoto</span>
+    <span class="phone-style">来自 企鹅相册 · QzonePhoto</span>
     <i name="feed_data" data-topicid="${topicId}"></i>
   </div>`
 
@@ -97,7 +97,7 @@ const photoFeeds = [
     comments: [],
     like_users: '',
     visitorCount: 126,
-    source_name: '企鹅相册 - QzonePhoto'
+    source_name: '企鹅相册 · QzonePhoto'
   },
   {
     skey: 'demo-photo-feed-2',
@@ -122,7 +122,7 @@ const photoFeeds = [
     comments: [],
     like_users: '',
     visitorCount: 84,
-    source_name: '企鹅相册 - QzonePhoto'
+    source_name: '企鹅相册 · QzonePhoto'
   }
 ]
 
@@ -248,6 +248,7 @@ export const createDemoQzoneAPI = (realApi) => ({
     onUpdateAvailable: listen,
     onUpdateNotAvailable: listen,
     onDownloadProgress: listen,
+    onUpdateDownloadFallback: listen,
     onUpdateDownloaded: listen,
     onUpdateError: listen,
     removeAllListeners: () => {}

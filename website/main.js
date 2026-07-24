@@ -363,6 +363,7 @@
   }
 
   function setManifestStatus(status) {
+    setDownloadManifestState(status)
     document.querySelectorAll('[data-manifest-status]').forEach((item) => {
       item.classList.remove('ready', 'fallback')
       if (status === 'ready') {
@@ -372,6 +373,12 @@
         item.classList.add('fallback')
         item.textContent = '版本信息暂时不可用，下载入口仍可使用'
       }
+    })
+  }
+
+  function setDownloadManifestState(status) {
+    document.querySelectorAll('[data-download-shell]').forEach((shell) => {
+      shell.dataset.manifestState = status
     })
   }
 
@@ -409,11 +416,12 @@
 
   function buildAssetMeta(asset, fallback) {
     const manifestAsset = state.manifest.assets.find((item) => item.id === asset)
-    return [
-      state.manifest.version ? `v${state.manifest.version}` : '',
-      manifestAsset?.size ? formatBytes(manifestAsset.size) : '',
-      fallback
-    ]
+    const versionCopy = state.manifest.version
+      ? `v${state.manifest.version}`
+      : state.manifestSource === 'fallback'
+        ? '版本信息暂时不可用'
+        : '正在获取最新版本'
+    return [versionCopy, manifestAsset?.size ? formatBytes(manifestAsset.size) : '', fallback]
       .filter(Boolean)
       .join(' · ')
   }

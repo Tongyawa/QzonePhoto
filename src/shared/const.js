@@ -1,6 +1,6 @@
 export const APP_ID = 'com.qzonephoto.app'
 export const APP_NAME = 'QzonePhoto'
-export const APP_DISPLAY_NAME = '企鹅相册 - QzonePhoto'
+export const APP_DISPLAY_NAME = '企鹅相册 · QzonePhoto'
 export const APP_WEBSITE = 'https://qzonephoto.getgit.one'
 export const APP_DOWNLOAD_PAGE = `${APP_WEBSITE}/#download`
 export const APP_HOMEPAGE = 'https://github.com/11273/QzonePhoto'

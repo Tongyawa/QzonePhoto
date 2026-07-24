@@ -55,7 +55,7 @@ export const buildMediaMetadata = (metadata = {}, fallbackDescription = '') => {
     publishedAt.display ? `发布时间：${publishedAt.display}` : '',
     albumName ? `相册：${albumName}` : '',
     sourceUrl ? `空间链接：${sourceUrl}` : '',
-    '来源：QQ 空间（由企鹅相册 - QzonePhoto 保存）'
+    '来源：QQ 空间（由企鹅相册 · QzonePhoto 保存）'
   ].filter(Boolean)
   const comment = normalizeText(lines.join('\n'), MAX_COMMENT_LENGTH)
 
@@ -180,7 +180,7 @@ export const writeVideoMetadata = async (filePath, metadata, fallbackDescription
     '-metadata',
     'copyright=QQ 空间',
     '-metadata',
-    'publisher=企鹅相册 - QzonePhoto'
+    'publisher=企鹅相册 · QzonePhoto'
   ]
   if (normalized.publishedAtIso) {
     metadataArgs.push('-metadata', `date=${normalized.publishedAtIso}`)

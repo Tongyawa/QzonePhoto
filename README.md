@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="resources/icon.png" alt="企鹅相册 - QzonePhoto" width="96" />
+<img src="resources/icon.png" alt="企鹅相册 · QzonePhoto" width="96" />
 
-<h1>企鹅相册 - QzonePhoto</h1>
+<h1>企鹅相册 · QzonePhoto</h1>
 
 <p>把 QQ 空间的相册、照片、视频、动态和好友空间带回本地，并按你想要的方式管理。</p>
 
@@ -33,11 +33,11 @@
 > [!IMPORTANT]
 > 官方网站：[qzonephoto.getgit.one](https://qzonephoto.getgit.one/)。本项目开源免费使用，请仅从官网或项目主页下载。
 >
-> 企鹅相册 - QzonePhoto 是非官方第三方工具，与腾讯、QQ 或 QQ 空间不存在隶属或授权关系。
+> 企鹅相册 · QzonePhoto 是非官方第三方工具，与腾讯、QQ 或 QQ 空间不存在隶属或授权关系。
 
 ## 简介
 
-企鹅相册 - QzonePhoto 是一个跨平台的 QQ 空间桌面客户端，复用 QQ 空间网页端官方接口完成登录与数据获取，所有数据仅在本地处理。它现在不只看相册，也能在「照片 / 视频 / 动态」里查看自己和好友的空间内容，下载原图、视频和整条说说媒体，并把官方空间页放进应用内窗口打开。
+企鹅相册 · QzonePhoto 是一个跨平台的 QQ 空间桌面客户端，复用 QQ 空间网页端官方接口完成登录与数据获取，所有数据仅在本地处理。它现在不只看相册，也能在「照片 / 视频 / 动态」里查看自己和好友的空间内容，下载原图、视频和整条说说媒体，并把官方空间页放进应用内窗口打开。
 
 ## 截图
 

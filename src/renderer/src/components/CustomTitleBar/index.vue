@@ -79,24 +79,51 @@
             </div>
           </template>
           <template v-else>
-            <span class="app-version-content" :class="{ checking: updateState.checking }">
+            <transition name="version-feedback" mode="out-in">
               <span
-                class="app-version"
-                :class="{
-                  'has-update': showUpdateBadge,
-                  checking: updateState.checking
-                }"
+                v-if="versionCheckFeedback"
+                class="version-check-feedback"
+                :class="`is-${versionCheckFeedback.tone}`"
+                aria-live="polite"
               >
-                {{ versionChipText }}
+                <svg
+                  v-if="versionCheckFeedback.tone === 'success'"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <path d="m3.5 8.2 2.7 2.7 6.2-6.1" />
+                </svg>
+                <svg
+                  v-else-if="versionCheckFeedback.tone === 'error'"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <path d="m4.2 4.2 7.6 7.6m0-7.6-7.6 7.6" />
+                </svg>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 3.2v4.9l3.1 1.9M13 8A5 5 0 1 1 3 8a5 5 0 0 1 10 0Z" />
+                </svg>
+                <span>{{ versionCheckFeedback.text }}</span>
               </span>
-              <span
-                v-if="updateState.checking"
-                class="checking-indicator inline-checking-indicator"
-                title="正在检查更新..."
-              >
-                <span class="checking-spinner"></span>
+              <span v-else class="app-version-content" :class="{ checking: updateState.checking }">
+                <span
+                  class="app-version"
+                  :class="{
+                    'has-update': showUpdateBadge,
+                    checking: updateState.checking
+                  }"
+                >
+                  {{ versionChipText }}
+                </span>
+                <span
+                  v-if="updateState.checking"
+                  class="checking-indicator inline-checking-indicator"
+                  title="正在检查更新..."
+                >
+                  <span class="checking-spinner"></span>
+                </span>
               </span>
-            </span>
+            </transition>
             <transition name="fade">
               <span
                 v-if="showUpdateBadge"
@@ -328,6 +355,9 @@ import Icon from '@renderer/components/Icon/index.vue'
 import ProgressBar from '@renderer/components/ProgressBar/index.vue'
 import { formatBytes } from '@renderer/utils/formatters'
 import { copyToClipboard } from '@renderer/utils'
+import { getUpdateCheckFeedback } from './update-check-feedback'
+
+const UPDATE_CHECK_UI_TIMEOUT_MS = 8000
 
 // 简单的版本号格式化函数
 const formatVersion = (version) => {
@@ -380,6 +410,8 @@ const updateState = reactive({
   bytesPerSecond: 0,
   transferred: 0,
   total: 0,
+  remainingTime: '',
+  usingFallbackDownload: false,
   canCancel: true,
   hasUpdate: false
 })
@@ -398,6 +430,10 @@ let appNoticeChecked = false
 const silentChecking = ref(false)
 const pendingNoticeAutoOpen = ref(false)
 const pendingUpdateDialogOpen = ref(false)
+const versionCheckFeedback = ref(null)
+const isUpdateCheckRequestPending = ref(false)
+let versionCheckFeedbackTimer = null
+let updateCheckUiTimer = null
 
 // 计算属性
 const showUpdateBadge = computed(() => {
@@ -415,15 +451,15 @@ const showUpdateStatusBlock = computed(() => {
 const versionChipText = computed(() => {
   if (updateState.downloading) return appVersion.value || '更新'
   if (updateState.downloaded) return '已就绪'
-  if (updateState.checking) return '检查中'
   if (showUpdateBadge.value) return '新版本'
   return appVersion.value
 })
 
 const versionStatusTitle = computed(() => {
   if (updateState.checking) return '检查更新'
-  if (updateState.downloading) return `下载 ${appVersion.value || ''}`.trim()
-  if (updateState.downloaded) return `已就绪 ${appVersion.value || ''}`.trim()
+  const targetVersion = updateInfo.value?.version || appVersion.value || ''
+  if (updateState.downloading) return `下载 ${targetVersion}`.trim()
+  if (updateState.downloaded) return `已就绪 ${targetVersion}`.trim()
   return appVersion.value
 })
 
@@ -431,6 +467,7 @@ const versionStateClass = computed(() => ({
   checking: updateState.checking,
   downloading: updateState.downloading,
   downloaded: updateState.downloaded,
+  feedback: Boolean(versionCheckFeedback.value),
   'has-update': showUpdateBadge.value
 }))
 
@@ -438,7 +475,9 @@ const downloadProgress = computed(() => ({
   percent: updateState.progress,
   downloaded: Math.round((updateState.transferred / 1024 / 1024) * 100) / 100,
   total: Math.round((updateState.total / 1024 / 1024) * 100) / 100,
-  speed: Math.round(updateState.bytesPerSecond / 1024)
+  speed: Math.round(updateState.bytesPerSecond / 1024),
+  remainingTime: updateState.remainingTime,
+  sourceHint: updateState.usingFallbackDownload ? '正在尝试其他下载方式' : ''
 }))
 
 const progressText = computed(() => {
@@ -488,6 +527,15 @@ const showNoticeEntry = computed(() => !!apiBaseUrl.value && notices.value.lengt
 // 版本号提示文本
 const getVersionTooltip = () => {
   const suffix = '\n右键复制版本号'
+  if (versionCheckFeedback.value?.tone === 'success') {
+    return '已是最新版本，点击可再次检查' + suffix
+  }
+  if (versionCheckFeedback.value?.tone === 'info') {
+    return '检查仍在后台进行，请稍后再试' + suffix
+  }
+  if (versionCheckFeedback.value?.tone === 'error') {
+    return '检查失败，点击重试' + suffix
+  }
   if (updateState.checking) {
     return '正在检查更新...' + suffix
   } else if (updateState.hasUpdate) {
@@ -495,6 +543,51 @@ const getVersionTooltip = () => {
   } else {
     return '点击检查更新' + suffix
   }
+}
+
+const clearVersionCheckFeedback = () => {
+  if (versionCheckFeedbackTimer) {
+    clearTimeout(versionCheckFeedbackTimer)
+    versionCheckFeedbackTimer = null
+  }
+  versionCheckFeedback.value = null
+}
+
+const showVersionCheckFeedback = (type) => {
+  const feedback = getUpdateCheckFeedback(type)
+  if (!feedback) return
+
+  clearVersionCheckFeedback()
+  versionCheckFeedback.value = feedback
+  versionCheckFeedbackTimer = setTimeout(() => {
+    versionCheckFeedback.value = null
+    versionCheckFeedbackTimer = null
+  }, feedback.duration)
+}
+
+const clearUpdateCheckUiTimer = () => {
+  if (updateCheckUiTimer) {
+    clearTimeout(updateCheckUiTimer)
+    updateCheckUiTimer = null
+  }
+}
+
+const beginUpdateCheckRequest = (background) => {
+  isUpdateCheckRequestPending.value = true
+  silentChecking.value = background
+  updateState.checking = true
+  clearVersionCheckFeedback()
+  clearUpdateCheckUiTimer()
+  updateCheckUiTimer = setTimeout(() => {
+    if (!isUpdateCheckRequestPending.value || !updateState.checking) return
+    updateState.checking = false
+    if (!background) showVersionCheckFeedback('slow')
+  }, UPDATE_CHECK_UI_TIMEOUT_MS)
+}
+
+const finishUpdateCheckRequest = () => {
+  isUpdateCheckRequestPending.value = false
+  clearUpdateCheckUiTimer()
 }
 
 // 窗口控制方法
@@ -593,68 +686,35 @@ const handleVersionClick = async (background = false) => {
     if (!background) {
       showUpdateDialog()
     }
-  } else if (updateState.checking) {
-    if (!background) {
-      silentChecking.value = false
-    }
-    // 正在检查中，如果不是后台模式，显示对话框
-    if (!background) {
-      showUpdateDialog()
-    }
+  } else if (isUpdateCheckRequestPending.value || updateState.checking) {
+    return
   } else {
-    // 手动检查更新
     if (window.QzoneAPI?.update) {
       try {
         console.log(background ? '后台检查更新...' : '手动检查更新...')
-        silentChecking.value = background
-        updateState.checking = true
+        beginUpdateCheckRequest(background)
+        const result = await window.QzoneAPI.update.checkForUpdates()
 
-        // 只有非后台模式才显示对话框
-        if (!background) {
-          dialogState.value = 'checking'
-          dialogVisible.value = true
-        }
-
-        // 调用检查更新
-        await window.QzoneAPI.update.checkForUpdates()
-
-        // 如果3秒后还在检查状态，显示无更新提示
-        setTimeout(() => {
-          if (updateState.checking && !updateState.hasUpdate) {
-            updateState.checking = false
-            silentChecking.value = false
-
-            // 只有非后台模式才更新对话框状态
-            if (!background) {
-              dialogState.value = 'no-update'
-
-              // 2秒后自动关闭对话框
-              setTimeout(() => {
-                if (dialogState.value === 'no-update') {
-                  dialogVisible.value = false
-                  dialogState.value = 'idle'
-                }
-              }, 2000)
-            }
+        // 主进程可能因开发环境跳过检查，或正在处理另一轮检查而没有发送完成事件。
+        // 此时不能让标题栏保留“检查中”状态。
+        if (result?.skipped || result === null) {
+          updateState.checking = false
+          silentChecking.value = false
+          if (!background && result?.reason === 'checking') {
+            showVersionCheckFeedback('slow')
           }
-        }, 3000)
+        }
       } catch (error) {
         console.error('检查更新失败:', error)
         updateState.checking = false
         silentChecking.value = false
-
-        // 只有非后台模式才显示错误
-        if (!background) {
-          dialogState.value = 'error'
-          errorInfo.value = {
-            message: error.message || '检查更新失败',
-            canRetry: true
-          }
-        }
+        if (!background) showVersionCheckFeedback('error')
+      } finally {
+        finishUpdateCheckRequest()
       }
     } else {
-      // 没有更新API，显示提示
       console.warn('更新API不可用')
+      if (!background) showVersionCheckFeedback('error')
     }
   }
 }
@@ -703,6 +763,8 @@ const handleDownloadUpdate = async () => {
     updateState.downloaded = false
     updateState.downloading = true
     updateState.progress = 0
+    updateState.remainingTime = ''
+    updateState.usingFallbackDownload = false
     dialogState.value = 'downloading'
     const result = await window.QzoneAPI.update.downloadUpdate()
     if (result?.manualDownload) {
@@ -713,9 +775,13 @@ const handleDownloadUpdate = async () => {
     console.log('下载更新API调用完成')
   } catch (error) {
     console.error('下载更新失败:', error)
+    updateState.downloading = false
+    updateState.remainingTime = ''
+    updateState.usingFallbackDownload = false
     dialogState.value = 'error'
     errorInfo.value = {
       message: error.message || '下载更新失败',
+      detail: '请稍后重试，或选择其他下载方式。',
       canRetry: true
     }
   }
@@ -762,6 +828,8 @@ const cancelUpdate = async () => {
     updateState.bytesPerSecond = 0
     updateState.transferred = 0
     updateState.total = 0
+    updateState.remainingTime = ''
+    updateState.usingFallbackDownload = false
   } catch (error) {
     console.error('取消更新失败:', error)
   }
@@ -775,15 +843,16 @@ const handleWindowMaximized = (maximized) => {
 // 更新事件处理
 const handleUpdateChecking = () => {
   updateState.checking = true
-  if (!silentChecking.value) {
-    dialogState.value = 'checking'
-  }
+  clearVersionCheckFeedback()
 }
 
 const handleUpdateAvailable = (info) => {
+  clearUpdateCheckUiTimer()
   updateState.checking = false
   silentChecking.value = false
+  clearVersionCheckFeedback()
   updateState.hasUpdate = true
+  updateState.usingFallbackDownload = false
   updateInfo.value = info
   dialogState.value = 'available'
 
@@ -800,17 +869,14 @@ const handleUpdateAvailable = (info) => {
 
 const handleUpdateNotAvailable = (info) => {
   console.log('没有更新:', info)
+  clearUpdateCheckUiTimer()
+  const wasSilent = silentChecking.value
   updateState.checking = false
   silentChecking.value = false
   updateState.hasUpdate = false
 
-  // 如果对话框是打开的，显示无更新状态
-  if (dialogVisible.value) {
-    updateInfo.value = info
-    dialogState.value = 'no-update'
-  } else {
-    dialogState.value = 'idle'
-  }
+  if (!wasSilent) showVersionCheckFeedback('latest')
+  if (!dialogVisible.value) dialogState.value = 'idle'
 }
 
 const handleDownloadProgress = (progressObj) => {
@@ -820,6 +886,14 @@ const handleDownloadProgress = (progressObj) => {
   updateState.bytesPerSecond = progressObj.bytesPerSecond || 0
   updateState.transferred = progressObj.transferred || 0
   updateState.total = progressObj.total || 0
+  updateState.remainingTime = progressObj.remainingTime || ''
+  dialogState.value = 'downloading'
+}
+
+const handleUpdateDownloadFallback = () => {
+  updateState.downloading = true
+  updateState.usingFallbackDownload = true
+  updateState.remainingTime = ''
   dialogState.value = 'downloading'
 }
 
@@ -828,17 +902,29 @@ const handleUpdateDownloaded = () => {
   updateState.downloaded = true
   updateState.progress = 100
   updateState.hasUpdate = false
+  updateState.remainingTime = ''
+  updateState.usingFallbackDownload = false
   dialogState.value = 'downloaded'
   console.log('更新下载完成，等待用户确认安装')
 }
 
 const handleUpdateError = (error) => {
+  clearUpdateCheckUiTimer()
+  const wasChecking = updateState.checking
+  const wasSilent = silentChecking.value
   updateState.checking = false
   updateState.downloading = false
   silentChecking.value = false
   updateState.progress = 0
-  dialogState.value = 'error'
-  errorInfo.value = error
+  updateState.remainingTime = ''
+  updateState.usingFallbackDownload = false
+  if (wasChecking) {
+    if (!wasSilent) showVersionCheckFeedback('error')
+    if (!dialogVisible.value) dialogState.value = 'idle'
+  } else {
+    dialogState.value = 'error'
+    errorInfo.value = error
+  }
   console.error('更新错误:', error)
 }
 
@@ -1002,7 +1088,6 @@ onMounted(async () => {
   fetchAppNotice()
   scheduleActionDensity()
   clearInitialTitlebarFocus()
-  handleVersionClick(true)
   // 获取初始窗口状态
   try {
     isMaximized.value = await window.api.invoke(IPC_WINDOW.IS_MAXIMIZED)
@@ -1020,15 +1105,17 @@ onMounted(async () => {
     window.QzoneAPI.update.onUpdateAvailable(handleUpdateAvailable)
     window.QzoneAPI.update.onUpdateNotAvailable(handleUpdateNotAvailable)
     window.QzoneAPI.update.onDownloadProgress(handleDownloadProgress)
+    window.QzoneAPI.update.onUpdateDownloadFallback?.(handleUpdateDownloadFallback)
     window.QzoneAPI.update.onUpdateDownloaded(handleUpdateDownloaded)
     window.QzoneAPI.update.onUpdateError(handleUpdateError)
-
-    // 注意：自动检查更新已在主进程启动时执行
-    // 这里只需要监听更新事件即可
   }
+
+  handleVersionClick(true)
 })
 
 onUnmounted(() => {
+  clearVersionCheckFeedback()
+  clearUpdateCheckUiTimer()
   if (densityFrame) cancelAnimationFrame(densityFrame)
   resizeObserver?.disconnect?.()
   titleBarRef.value?.removeEventListener('focusin', handleTitlebarFocusIn)
@@ -1737,6 +1824,41 @@ watch([dialogVisible, noticeVisible], () => {
   gap: 5px;
 }
 
+.version-check-feedback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.version-check-feedback svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.version-check-feedback.is-success {
+  color: var(--ds-state-success);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.2);
+}
+
+.version-check-feedback.is-info {
+  color: #93c5fd;
+}
+
+.version-check-feedback.is-error {
+  color: var(--ds-state-error);
+}
+
 .version-container:hover {
   background: transparent;
   border-color: transparent;
@@ -1989,6 +2111,19 @@ watch([dialogVisible, noticeVisible], () => {
 }
 
 /* 过渡动画 */
+.version-feedback-enter-active,
+.version-feedback-leave-active {
+  transition:
+    opacity 160ms var(--ds-ease-soft),
+    transform 160ms var(--ds-ease-soft);
+}
+
+.version-feedback-enter-from,
+.version-feedback-leave-to {
+  opacity: 0;
+  transform: translateY(2px);
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;

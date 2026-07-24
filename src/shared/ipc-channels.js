@@ -237,6 +237,8 @@ export const IPC_UPDATE = {
   NOT_AVAILABLE: 'update:notAvailable',
   /** 下载进度 */
   DOWNLOAD_PROGRESS: 'update:downloadProgress',
+  /** 主下载源不可用，正在尝试备用下载 */
+  DOWNLOAD_FALLBACK: 'update:downloadFallback',
   /** 更新已下载 */
   DOWNLOADED: 'update:downloaded',
   /** 更新错误 */

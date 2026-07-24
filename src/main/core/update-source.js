@@ -11,6 +11,15 @@ export function isStableReleaseVersion(value) {
   return /^\d+\.\d+\.\d+$/.test(String(value || '').trim())
 }
 
+/**
+ * R2 是主更新源。只有 R2 未返回可用的稳定版元数据时，GitHub 才需要接管前台检查。
+ * 当 R2 已明确返回当前稳定版本时，GitHub 仍可在后台补查，以兼容“先发 GitHub、后推 R2”的验证流程。
+ */
+export function getGitHubFallbackMode(r2Result, r2Candidate) {
+  if (r2Candidate) return 'skip'
+  return isStableReleaseVersion(r2Result?.updateInfo?.version) ? 'background' : 'visible'
+}
+
 function isSafeAssetUrl(value) {
   const url = String(value || '').trim()
   return Boolean(url) && !/[\\/]|:\/\/|[?#]|\.\./.test(url)

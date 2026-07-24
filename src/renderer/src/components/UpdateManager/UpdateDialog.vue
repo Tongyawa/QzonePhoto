@@ -1,305 +1,234 @@
 <template>
-  <!-- 自定义弹窗遮罩 -->
   <teleport to="body">
     <transition name="dialog-fade">
       <div v-if="dialogVisible" class="dialog-overlay" @click.self="handleOverlayClick">
-        <div class="update-container">
-          <!-- 头部区域 -->
-          <div class="update-header">
-            <div class="header-left">
-              <div class="update-icon" :class="getIconClass()">
-                <div class="icon-content">
-                  <svg
-                    v-if="updateState === 'checking'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M21 12c0 1-.9 2-2 2h-3.5c-.5 0-.5-.5-.5-.5s0-.5.5-.5H19c.6 0 1-.4 1-1 0-5-4-9-9-9s-9 4-9 9c0 .6.4 1 1 1h3.5c.5 0 .5.5.5.5s0 .5-.5.5H2c-1.1 0-2-1-2-2C0 5.4 5.4 0 12 0s12 5.4 12 12z"
-                    />
-                  </svg>
-                  <svg
-                    v-else-if="updateState === 'available'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7,10 12,15 17,10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  <svg
-                    v-else-if="updateState === 'downloading'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17,8 12,3 7,8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <svg
-                    v-else-if="updateState === 'downloaded'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22,4 12,14.01 9,11.01" />
-                  </svg>
-                  <svg
-                    v-else-if="updateState === 'no-update'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="20,6 9,17 4,12" />
-                  </svg>
-                  <svg
-                    v-else-if="updateState === 'error'"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div class="header-right">
-              <div class="update-title">
-                {{ getTitle() }}
-                <span class="version-info-current">{{ updateInfo.currentVersion }}</span>
-                <span v-if="updateState === 'available'" class="version-info-new">
-                  <el-icon><Right /></el-icon> {{ updateInfo.version }}
-                </span>
-              </div>
-              <div class="update-subtitle">{{ getSubtitle() }}</div>
-            </div>
-            <div v-if="canClose()" class="close-btn" @click="$emit('dismiss')">
+        <section
+          ref="dialogRef"
+          class="update-container"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="update-dialog-title"
+          aria-describedby="update-dialog-subtitle"
+          tabindex="-1"
+        >
+          <header class="update-header">
+            <div class="update-icon" :class="getIconClass()" aria-hidden="true">
               <svg
-                width="16"
-                height="16"
+                v-if="updateState === 'checking'"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
               >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                <path d="M20 4v5h-5" />
+              </svg>
+              <svg
+                v-else-if="updateState === 'available'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M12 15V3" />
+              </svg>
+              <svg
+                v-else-if="updateState === 'downloading'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="m17 8-5-5-5 5" />
+                <path d="M12 3v12" />
+              </svg>
+              <svg
+                v-else-if="updateState === 'downloaded' || updateState === 'no-update'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m15 9-6 6m0-6 6 6" />
               </svg>
             </div>
-          </div>
 
-          <!-- 内容区域 -->
-          <div class="update-content">
-            <!-- 更新检查中 -->
-            <div v-if="updateState === 'checking'" class="content-checking">
-              <div class="checking-animation">
-                <div class="pulse-ring"></div>
-                <div class="pulse-ring delay-1"></div>
-                <div class="pulse-ring delay-2"></div>
-              </div>
-              <p class="checking-text">正在检查更新...</p>
+            <div class="header-copy">
+              <h2 id="update-dialog-title" class="update-title">{{ getTitle() }}</h2>
+              <p v-if="versionLabel" class="update-version">{{ versionLabel }}</p>
+              <p id="update-dialog-subtitle" class="update-subtitle">{{ getSubtitle() }}</p>
             </div>
 
-            <!-- 发现更新 -->
-            <div v-if="updateState === 'available'" class="content-available">
-              <!-- <div class="version-info">
-                <div class="new-version">{{ updateInfo.version }}</div>
-                <div class="version-label">新版本可用</div>
-              </div> -->
-              <div v-if="updateInfo.releaseNotes" class="release-notes">
-                <Markdown :content="updateInfo.releaseNotes" />
-              </div>
+            <button
+              v-if="canClose()"
+              class="close-btn"
+              type="button"
+              aria-label="关闭更新窗口"
+              title="关闭"
+              @click="$emit('dismiss')"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </header>
+
+          <main class="update-content">
+            <div v-if="updateState === 'checking'" class="status-copy">
+              <span class="status-spinner" aria-hidden="true"></span>
+              <p>正在确认是否有新版本</p>
             </div>
 
-            <!-- 下载进度 -->
-            <div v-if="updateState === 'downloading'" class="content-downloading">
-              <div class="progress-container">
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: downloadProgress.percent + '%' }">
-                    <div class="progress-shine"></div>
-                  </div>
+            <div v-else-if="updateState === 'available'" class="update-summary">
+              <section
+                v-if="updatePresentation.releaseNotes.hasNotes"
+                class="release-notes-section"
+                aria-label="更新说明"
+              >
+                <div
+                  id="update-release-notes"
+                  class="release-notes-scroll"
+                  role="region"
+                  tabindex="0"
+                  aria-label="更新内容"
+                >
+                  <Markdown :content="updatePresentation.releaseNotes.content" />
                 </div>
-                <div class="progress-text">{{ downloadProgress.percent }}%</div>
+              </section>
+
+              <p v-else class="update-reassurance">本次更新包含体验优化和问题修复。</p>
+            </div>
+
+            <div v-else-if="updateState === 'downloading'" class="download-panel">
+              <div class="download-progress-heading">
+                <span>{{ downloadStatusText }}</span>
+                <strong>{{ downloadPercent }}%</strong>
+              </div>
+              <div
+                class="progress-bar"
+                role="progressbar"
+                aria-label="更新下载进度"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="downloadPercent"
+              >
+                <div class="progress-fill" :style="{ width: downloadPercent + '%' }"></div>
               </div>
               <div class="download-stats">
-                <span>{{ getFormattedSize() }}</span>
-                <span>{{ getFormattedSpeed() }}</span>
+                <span>{{ formattedDownloadSize }}</span>
+                <span>{{ formattedDownloadSpeed }}</span>
+                <span>{{ downloadRemainingText }}</span>
               </div>
             </div>
 
-            <!-- 更新已下载 -->
-            <div v-if="updateState === 'downloaded'" class="content-downloaded">
-              <div class="ready-icon">
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22,4 12,14.01 9,11.01"></polyline>
-                </svg>
-              </div>
-              <p class="ready-text">关闭应用后将自动安装并重启，大约 5 秒</p>
+            <div v-else-if="updateState === 'downloaded'" class="status-copy success-copy">
+              <span class="status-primary">重启应用后将自动完成安装。</span>
+              <span>也可以选择稍后安装。</span>
             </div>
 
-            <!-- 暂无更新 -->
-            <div v-if="updateState === 'no-update'" class="content-available">
-              <!-- <div class="latest-icon">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"
-                  ></path>
-                  <polyline points="9,11 12,14 15,11"></polyline>
-                  <line x1="12" y1="2" x2="12" y2="14"></line>
-                </svg>
-              </div>
-              <p class="latest-text">您正在使用最新版本</p> -->
-              <div v-if="updateInfo.releaseNotes" class="release-notes">
-                <Markdown :content="updateInfo.releaseNotes" />
-              </div>
+            <div v-else-if="updateState === 'no-update'" class="status-copy success-copy">
+              <span class="status-primary">无需更新</span>
+              <span>继续记录和整理你的空间回忆吧。</span>
             </div>
 
-            <!-- 更新错误 -->
-            <div v-if="updateState === 'error'" class="content-error">
-              <div class="error-icon">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="15" y1="9" x2="9" y2="15"></line>
-                  <line x1="9" y1="9" x2="15" y2="15"></line>
-                </svg>
-              </div>
-              <p class="error-message">{{ errorInfo.message }}</p>
-              <p class="error-detail">{{ errorInfo.detail }}</p>
+            <div v-else-if="updateState === 'error'" class="error-panel">
+              <p>{{ errorPresentation.title }}</p>
+              <span>{{ errorPresentation.detail }}</span>
+              <span class="error-reassurance">{{ errorPresentation.reassurance }}</span>
             </div>
-          </div>
+          </main>
 
-          <!-- 底部操作区域 -->
-          <div v-if="showFooter()" class="update-footer">
+          <footer v-if="showFooter()" class="update-footer">
             <div class="footer-actions">
-              <!-- 发现更新 -->
               <template v-if="updateState === 'available'">
-                <button class="btn btn-primary" @click="$emit('download')">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7,10 12,15 17,10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                <button class="btn btn-secondary" type="button" @click="$emit('dismiss')">
+                  稍后再说
+                </button>
+                <button class="btn btn-primary" type="button" @click="$emit('download')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M12 15V3" />
                   </svg>
                   立即下载
                 </button>
-                <button class="btn btn-secondary" @click="$emit('dismiss')">稍后再说</button>
               </template>
 
-              <!-- 下载中 -->
-              <template v-if="updateState === 'downloading'">
-                <button class="btn btn-danger" @click="$emit('cancel')">取消下载</button>
-                <button class="btn btn-secondary" @click="$emit('backgroundDownload')">
-                  后台下载
+              <template v-else-if="updateState === 'downloading'">
+                <button class="btn btn-secondary" type="button" @click="$emit('cancel')">
+                  取消下载
+                </button>
+                <button class="btn btn-primary" type="button" @click="$emit('backgroundDownload')">
+                  转到后台
                 </button>
               </template>
 
-              <!-- 下载完成 -->
-              <template v-if="updateState === 'downloaded'">
-                <button class="btn btn-primary" @click="$emit('install')">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
+              <template v-else-if="updateState === 'downloaded'">
+                <button class="btn btn-secondary" type="button" @click="$emit('dismiss')">
+                  稍后安装
+                </button>
+                <button class="btn btn-primary" type="button" @click="$emit('install')">
+                  立即重启更新
+                </button>
+              </template>
+
+              <template v-else-if="updateState === 'error'">
+                <div class="error-manual-actions">
+                  <button
+                    class="text-action"
+                    type="button"
+                    @click="openExternal(manualDownloadChoices.officialUrl)"
                   >
-                    <polyline points="23,4 23,10 17,10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                  </svg>
-                  立即重启
-                </button>
-                <button class="btn btn-secondary" @click="$emit('dismiss')">稍后安装</button>
-              </template>
-
-              <!-- 错误状态 -->
-              <template v-if="updateState === 'error'">
-                <button v-if="errorInfo.canRetry" class="btn btn-primary" @click="$emit('retry')">
-                  重试
-                </button>
-                <button class="btn btn-secondary" @click="openDownloadPage">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
+                    前往官网下载
+                  </button>
+                  <button
+                    class="text-action"
+                    type="button"
+                    title="打开备用下载页面"
+                    @click="openExternal(manualDownloadChoices.fallbackUrl)"
                   >
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                    <polyline points="15,3 21,3 21,9"></polyline>
-                    <line x1="10" y1="14" x2="21" y2="3"></line>
-                  </svg>
-                  手动下载
-                </button>
-                <button class="btn btn-secondary" @click="$emit('dismiss')">关闭</button>
+                    备用下载
+                  </button>
+                </div>
+                <div class="error-footer-actions">
+                  <button class="btn btn-secondary" type="button" @click="$emit('dismiss')">
+                    关闭
+                  </button>
+                  <button
+                    v-if="errorPresentation.canRetry"
+                    class="btn btn-primary"
+                    type="button"
+                    @click="$emit('retry')"
+                  >
+                    {{ errorPresentation.retryLabel }}
+                  </button>
+                </div>
               </template>
             </div>
-          </div>
-        </div>
+          </footer>
+        </section>
       </div>
     </transition>
   </teleport>
 </template>
 
 <script setup>
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { formatBytes } from '@renderer/utils/formatters'
-import { APP_DOWNLOAD_PAGE } from '@shared/const'
-import { computed } from 'vue'
+import { APP_DOWNLOAD_PAGE, APP_HOMEPAGE } from '@shared/const'
 import Markdown from '@renderer/components/Markdown/index.vue'
-import { Right } from '@element-plus/icons-vue'
+import {
+  buildUpdatePresentation,
+  getManualDownloadChoices,
+  getUpdateErrorPresentation
+} from './update-presentation'
 
 const props = defineProps({
   visible: {
@@ -320,15 +249,17 @@ const props = defineProps({
       percent: 0,
       downloaded: 0,
       total: 0,
-      speed: 0
+      speed: 0,
+      remainingTime: '',
+      sourceHint: ''
     })
   },
   errorInfo: {
     type: Object,
     default: () => ({
       message: '',
-      canRetry: false,
-      retryCount: 0
+      detail: '',
+      canRetry: false
     })
   }
 })
@@ -343,12 +274,50 @@ const emit = defineEmits([
   'backgroundDownload'
 ])
 
+const dialogRef = ref(null)
 const dialogVisible = computed({
   get: () => props.visible,
   set: (value) => emit('update:visible', value)
 })
+const updatePresentation = computed(() => buildUpdatePresentation(props.updateInfo))
+const versionLabel = computed(() => updatePresentation.value.versionLabel)
+const errorPresentation = computed(() => getUpdateErrorPresentation(props.errorInfo))
+const manualDownloadChoices = computed(() =>
+  getManualDownloadChoices({
+    officialUrl: APP_DOWNLOAD_PAGE,
+    fallbackUrl: APP_HOMEPAGE + '/releases/latest'
+  })
+)
+const downloadPercent = computed(() => {
+  const percent = Number(props.downloadProgress.percent)
+  return Math.max(0, Math.min(100, Math.round((Number.isFinite(percent) ? percent : 0) * 10) / 10))
+})
+const downloadStatusText = computed(
+  () => props.downloadProgress.sourceHint || '正在下载 ' + (props.updateInfo.version || '更新文件')
+)
+const formattedDownloadSize = computed(() => {
+  const downloaded = Number(props.downloadProgress.downloaded)
+  const total = Number(props.downloadProgress.total)
+  if (downloaded > 0 || total > 0) {
+    return (
+      (Number.isFinite(downloaded) ? downloaded.toFixed(1) : '0.0') +
+      ' MB / ' +
+      (Number.isFinite(total) ? total.toFixed(1) : '0.0') +
+      ' MB'
+    )
+  }
+  return '正在准备下载'
+})
+const formattedDownloadSpeed = computed(() => {
+  const speed = Number(props.downloadProgress.speed)
+  return speed > 0 ? formatBytes(speed * 1024) + '/s' : '正在连接'
+})
+const downloadRemainingText = computed(() =>
+  props.downloadProgress.remainingTime
+    ? '预计还需 ' + props.downloadProgress.remainingTime
+    : '正在计算剩余时间'
+)
 
-// 获取图标类名
 const getIconClass = () => {
   const classes = {
     checking: 'icon-checking',
@@ -361,697 +330,603 @@ const getIconClass = () => {
   return classes[props.updateState] || 'icon-default'
 }
 
-// 获取标题
 const getTitle = () => {
   const titles = {
     checking: '检查更新',
     available: '发现新版本',
-    downloading: '正在下载',
-    downloaded: '准备安装',
-    'no-update': '已是最新',
-    error: '更新失败'
+    downloading: '正在下载更新',
+    downloaded: '更新已准备好',
+    'no-update': '已经是最新版本',
+    error: '更新没有完成'
   }
   return titles[props.updateState] || '软件更新'
 }
 
-// 获取副标题
 const getSubtitle = () => {
   const subtitles = {
-    checking: '正在检查是否有新版本...',
-    // available: `${props.updateInfo.version} 现已可用，发布于 ${new Date(props.updateInfo.releaseDate).toLocaleString('zh-CN')}`,
-    available: `发布于 ${new Date(props.updateInfo.releaseDate).toLocaleString('zh-CN')}`,
-    downloading: '正在下载更新文件...',
-    downloaded: '更新已下载完成',
-    'no-update': '您正在使用最新版本',
-    error: getErrorSubtitle()
+    checking: '请稍候',
+    available: updatePresentation.value.releaseDateLabel
+      ? '发布于 ' + updatePresentation.value.releaseDateLabel
+      : '新版本已准备好',
+    downloading: '下载可在后台继续进行',
+    downloaded: '新版本已下载到本机',
+    'no-update': '你正在使用最新版本',
+    error: '当前版本仍可正常使用'
   }
   return subtitles[props.updateState] || ''
 }
 
-// 获取错误副标题
-const getErrorSubtitle = () => {
-  const message = props.errorInfo.message || ''
-  if (message.includes('network') || message.includes('网络')) {
-    return '网络连接失败，请检查网络后重试'
-  } else if (message.includes('download') || message.includes('下载')) {
-    return '下载失败，您可以手动下载安装'
-  } else if (message.includes('install') || message.includes('安装')) {
-    return '安装失败，请尝试手动下载安装'
-  }
-  return '更新过程中发生错误'
-}
+const canClose = () => props.updateState !== 'downloading'
+const showFooter = () =>
+  ['available', 'downloading', 'downloaded', 'error'].includes(props.updateState)
 
-// 是否可以关闭
-const canClose = () => {
-  return props.updateState !== 'downloading'
-}
-
-// 是否显示底部
-const showFooter = () => {
-  return ['available', 'downloading', 'downloaded', 'error'].includes(props.updateState)
-}
-
-// 遮罩点击处理
 const handleOverlayClick = () => {
-  if (canClose()) {
-    emit('dismiss')
-  }
+  if (canClose()) emit('dismiss')
 }
 
-// 打开下载页面
-const openDownloadPage = () => {
-  const downloadUrl = APP_DOWNLOAD_PAGE
-
-  // 通过主进程打开外部链接
-  if (window.api && window.api.invoke) {
-    window.api.invoke('shell:openExternal', downloadUrl).catch((error) => {
-      console.error('打开下载页面失败:', error)
-      // 降级方案：复制链接到剪贴板
-      fallbackCopyLink(downloadUrl)
-    })
-  } else {
-    // 降级方案
-    fallbackCopyLink(downloadUrl)
-  }
-
-  console.log('正在打开下载页面:', downloadUrl)
-}
-
-// 降级方案：复制链接到剪贴板
 const fallbackCopyLink = (url) => {
-  try {
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        console.log('下载链接已复制到剪贴板:', url)
-        // 可以添加提示消息
-      })
-      .catch(() => {
-        console.warn('无法复制链接，请手动访问:', url)
-      })
-  } catch {
-    console.warn('无法复制链接，请手动访问:', url)
+  navigator.clipboard?.writeText(url).catch(() => {
+    console.warn('无法复制下载链接:', url)
+  })
+}
+
+const openExternal = (url) => {
+  if (window.api?.invoke) {
+    window.api.invoke('shell:openExternal', url).catch(() => fallbackCopyLink(url))
+    return
   }
+  fallbackCopyLink(url)
 }
 
-// 格式化文件大小显示
-const getFormattedSize = () => {
-  const progress = props.downloadProgress
-
-  return `${progress.downloaded}MB / ${progress.total}MB`
+const handleEscape = (event) => {
+  if (event.key === 'Escape' && props.visible && canClose()) emit('dismiss')
 }
 
-// 格式化下载速度显示
-const getFormattedSpeed = () => {
-  const progress = props.downloadProgress
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      nextTick(() => dialogRef.value?.focus())
+    }
+  }
+)
 
-  return `${formatBytes(progress.speed * 1024)}/s`
-}
+onMounted(() => window.addEventListener('keydown', handleEscape))
+onUnmounted(() => window.removeEventListener('keydown', handleEscape))
 </script>
 
 <style scoped>
-/* 弹窗遮罩层 */
 .dialog-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: var(--ds-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  inset: 0;
   z-index: 9999;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--ds-bg-overlay);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-/* 弹窗过渡动画 */
 .dialog-fade-enter-active,
 .dialog-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 180ms ease;
+}
+
+.dialog-fade-enter-active .update-container,
+.dialog-fade-leave-active .update-container {
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
 }
 
 .dialog-fade-enter-from,
 .dialog-fade-leave-to {
   opacity: 0;
-  transform: scale(0.9);
-}
-
-.dialog-fade-enter-active .update-container,
-.dialog-fade-leave-active .update-container {
-  transition: all 0.3s ease;
 }
 
 .dialog-fade-enter-from .update-container,
 .dialog-fade-leave-to .update-container {
-  transform: scale(0.9);
   opacity: 0;
+  transform: translateY(8px) scale(0.985);
 }
 
-/* 更新容器 */
 .update-container {
+  display: flex;
+  flex-direction: column;
+  width: min(496px, calc(100vw - 48px));
+  max-height: min(600px, calc(100vh - 48px));
+  overflow: hidden;
+  color: var(--ds-text-primary);
   background: var(--ds-bg-1);
   border: 1px solid var(--ds-border-light);
-  border-radius: var(--ds-radius-xl);
+  border-radius: 18px;
   box-shadow: var(--ds-shadow-xl);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  overflow: hidden;
-  width: 480px;
-  max-width: 90vw;
-  max-height: 80vh;
+  outline: none;
 }
 
-/* 头部区域 */
 .update-header {
   display: flex;
-  align-items: center;
-  padding: 24px 24px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative;
-}
-
-.header-left {
-  margin-right: 16px;
-  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 22px 18px;
+  border-bottom: 1px solid var(--ds-border-light);
 }
 
 .update-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  color: #fff;
+  border-radius: 14px;
 }
 
-.update-icon.icon-checking {
-  background: linear-gradient(135deg, #60a5fa 0%, #7eb8fc 100%);
-  animation: pulse-icon 2s ease-in-out infinite;
+.update-icon svg {
+  width: 26px;
+  height: 26px;
 }
 
-.update-icon.icon-available {
-  background: linear-gradient(135deg, #34d399 0%, #52e3a8 100%);
-  animation: glow-green 2s ease-in-out infinite alternate;
-}
-
+.update-icon.icon-checking,
+.update-icon.icon-available,
 .update-icon.icon-downloading {
-  background: linear-gradient(135deg, #fbbf24 0%, #fdcc54 100%);
-  animation: pulse-icon 1.5s ease-in-out infinite;
+  background: linear-gradient(135deg, var(--ds-accent-blue), #67a7ff);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ds-accent-blue) 24%, transparent);
 }
 
-.update-icon.icon-downloaded {
-  background: linear-gradient(135deg, #34d399 0%, #52e3a8 100%);
-  animation: success-pulse 1s ease-out;
-}
-
+.update-icon.icon-downloaded,
 .update-icon.icon-latest {
-  background: linear-gradient(135deg, #909399 0%, #b4bccc 100%);
+  color: var(--ds-state-success);
+  background: var(--ds-accent-green-soft);
 }
 
 .update-icon.icon-error {
-  background: linear-gradient(135deg, #f87171 0%, #fb9090 100%);
-  animation: error-shake 0.5s ease-in-out;
+  color: var(--ds-state-error);
+  background: var(--ds-accent-red-soft);
 }
 
-.icon-content {
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-right {
+.header-copy {
   flex: 1;
   min-width: 0;
 }
 
-.update-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.version-info-current {
-  color: #909399;
-  font-weight: 600;
-  text-shadow: 0 0 10px rgba(144, 147, 153, 0.3);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.version-info-new {
-  color: #34d399;
-  font-weight: 600;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
+.update-title,
+.update-version,
 .update-subtitle {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.4;
-}
-
-.close-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.5);
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-  transform: scale(1.05);
-}
-
-/* 内容区域 */
-.update-content {
-  padding: 24px;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 检查状态 */
-.content-checking {
-  text-align: center;
-}
-
-.checking-animation {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 20px;
-}
-
-.pulse-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #60a5fa;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: pulse-ring 2s ease-out infinite;
-}
-
-.pulse-ring.delay-1 {
-  animation-delay: 0.5s;
-}
-
-.pulse-ring.delay-2 {
-  animation-delay: 1s;
-}
-
-.checking-text {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
   margin: 0;
 }
 
-/* 发现更新 */
-.content-available {
-  text-align: center;
-  width: 100%;
-}
-
-.new-version {
-  font-size: 24px;
+.update-title {
+  color: var(--ds-text-primary);
+  font-size: 20px;
   font-weight: 700;
-  color: #34d399;
-  margin-bottom: 4px;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
-.version-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+.update-version {
+  margin-top: 4px;
+  color: var(--ds-accent-blue);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
-.update-time {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+.update-subtitle {
+  margin-top: 6px;
+  color: var(--ds-text-tertiary);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.release-notes {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  line-height: 1.5;
-  max-height: 250px;
-  overflow-y: auto;
-  text-align: left;
+.close-btn {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--ds-text-tertiary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
-/* 下载进度 */
-.content-downloading {
+.close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.close-btn:hover {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-3);
+  border-color: var(--ds-border-light);
+}
+
+.update-content {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-height: 152px;
+  padding: 20px 22px;
+  overflow: auto;
+}
+
+.update-summary,
+.download-panel,
+.error-panel,
+.status-copy {
   width: 100%;
+}
+
+.update-summary {
+  display: grid;
+  align-content: start;
+}
+
+.download-progress-heading,
+.download-stats,
+.error-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.update-reassurance {
+  margin: 0;
+  color: var(--ds-text-tertiary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.release-notes-scroll {
+  max-height: min(260px, calc(100dvh - 260px));
+  padding: 4px 14px 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--ds-bg-3) 72%, transparent);
+  border: 1px solid var(--ds-border-light);
+  border-radius: 12px;
+  scrollbar-color: color-mix(in srgb, var(--ds-text-tertiary) 50%, transparent) transparent;
+}
+
+.release-notes-scroll :deep(.markdown-content) {
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.release-notes-scroll :deep(.markdown-content h3) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  margin: 10px 0 7px;
+  color: var(--ds-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--ds-bg-2) 72%, transparent);
+  border: 1px solid var(--ds-border-light);
+  border-radius: 9px;
+}
+
+.release-notes-scroll :deep(.markdown-content h3::before) {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  content: '';
+  background-color: color-mix(in srgb, var(--ds-accent-blue) 16%, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2367a7ff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m12 3-1.7 5.3L5 10l5.3 1.7L12 17l1.7-5.3L19 10l-5.3-1.7L12 3Z'/%3E%3Cpath d='m19 15-.7 2.3L16 18l2.3.7L19 21l.7-2.3L22 18l-2.3-.7L19 15Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1px solid color-mix(in srgb, var(--ds-accent-blue) 30%, transparent);
+  border-radius: 5px;
+}
+
+.release-notes-scroll :deep(.markdown-content h3:nth-of-type(2)::before) {
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234bd7a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m20 6-11 11-5-5'/%3E%3C/svg%3E");
+  background-color: color-mix(in srgb, var(--ds-state-success) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ds-state-success) 28%, transparent);
+}
+
+.release-notes-scroll :deep(.markdown-content h3:nth-of-type(3)::before) {
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23b093ff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 3v18M5 10l7-7 7 7M5 21h14'/%3E%3C/svg%3E");
+  background-color: rgba(176, 147, 255, 0.13);
+  border-color: rgba(176, 147, 255, 0.3);
+}
+
+.release-notes-scroll :deep(.markdown-content p),
+.release-notes-scroll :deep(.markdown-content ul),
+.release-notes-scroll :deep(.markdown-content ol) {
+  margin: 7px 0;
+}
+
+.release-notes-scroll :deep(.markdown-content ul),
+.release-notes-scroll :deep(.markdown-content ol) {
+  padding-left: 22px;
+}
+
+.release-notes-scroll :deep(.markdown-content li) {
+  padding-left: 2px;
+  margin: 6px 0;
+}
+
+.release-notes-scroll :deep(.markdown-content li::marker) {
+  color: var(--ds-accent-blue);
+}
+
+.release-notes-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.release-notes-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.release-notes-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ds-text-tertiary) 48%, transparent);
+  border-radius: 999px;
+}
+
+.status-copy {
+  display: grid;
+  align-self: center;
+  justify-items: center;
+  gap: 9px;
+  color: var(--ds-text-secondary);
   text-align: center;
 }
 
-.progress-container {
-  position: relative;
-  margin-bottom: 16px;
+.status-copy p,
+.error-panel p {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.status-copy span,
+.error-panel span {
+  color: var(--ds-text-tertiary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.status-copy .status-primary {
+  color: var(--ds-text-primary);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.status-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid color-mix(in srgb, var(--ds-accent-blue) 25%, transparent);
+  border-top-color: var(--ds-accent-blue);
+  border-radius: 50%;
+  animation: update-spin 800ms linear infinite;
+}
+
+.success-copy {
+  min-height: 96px;
+  align-content: center;
+}
+
+.download-panel {
+  display: grid;
+  align-self: center;
+  gap: 12px;
+}
+
+.download-progress-heading {
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.download-progress-heading strong {
+  color: var(--ds-text-primary);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bar {
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  height: 10px;
   overflow: hidden;
-  position: relative;
+  background: var(--ds-bg-3);
+  border-radius: 999px;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #fbbf24 0%, #fdcc54 100%);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-shine {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 100%
-  );
-  animation: shine 2s ease-in-out infinite;
-}
-
-.progress-text {
-  position: absolute;
-  top: -24px;
-  right: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
+  min-width: 2px;
+  background: linear-gradient(90deg, var(--ds-accent-blue), #70adff);
+  border-radius: inherit;
+  transition: width 180ms ease;
 }
 
 .download-stats {
-  display: flex;
-  justify-content: space-between;
+  color: var(--ds-text-tertiary);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
 }
 
-/* 下载完成 */
-.content-downloaded {
+.error-panel {
+  display: grid;
+  align-self: center;
+  justify-items: center;
+  gap: 9px;
   text-align: center;
 }
 
-.ready-icon {
-  color: #34d399;
-  margin-bottom: 16px;
-  animation: success-bounce 0.8s ease-out;
+.error-panel p {
+  color: var(--ds-state-error);
 }
 
-.ready-text {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  margin: 0;
+.error-reassurance {
+  max-width: 320px;
 }
 
-/* 无更新 */
-.content-no-update {
-  text-align: center;
-}
-
-.latest-icon {
-  color: #909399;
-  margin-bottom: 16px;
-  opacity: 0.8;
-}
-
-.latest-text {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
-  margin: 0;
-}
-
-/* 错误状态 */
-.content-error {
-  text-align: center;
-  width: 100%;
-  height: 100%;
-}
-
-.error-icon {
-  color: #f87171;
-  margin-bottom: 16px;
-  animation: error-pulse 0.6s ease-out;
-}
-
-.error-message {
-  color: #f87171;
-  font-size: 14px;
-  margin: 0;
-  line-height: 1.4;
-  user-select: text;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 180px;
-}
-
-.error-detail {
-  color: #f87171;
-  font-size: 14px;
-  margin: 0;
-  line-height: 1.4;
-  max-height: 180px;
-}
-
-/* 底部操作区域 */
 .update-footer {
-  padding: 20px 24px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.1);
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--ds-border-light);
 }
 
 .footer-actions {
   display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-/* 按钮样式 */
-.btn {
-  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  outline: none;
-  min-width: 100px;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
-.btn:focus-visible {
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 19px;
+  color: var(--ds-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  background: var(--ds-bg-3);
+  border: 1px solid var(--ds-border-light);
+  border-radius: 10px;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--ds-accent-blue);
+  border-color: var(--ds-accent-blue);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ds-accent-blue) 24%, transparent);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  background: var(--ds-bg-hover);
+}
+
+.btn-primary:hover {
+  background: var(--ds-accent-blue-hover);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:focus-visible,
+.close-btn:focus-visible,
+.text-action:focus-visible,
+.release-notes-scroll:focus-visible {
   outline: 2px solid var(--ds-accent-blue);
   outline-offset: 2px;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #60a5fa 0%, #7eb8fc 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(96, 165, 250, 0.3);
+.error-manual-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 22px;
+  margin-bottom: 6px;
 }
 
-.btn-primary:hover {
-  filter: brightness(1.12);
+.error-footer-actions {
+  width: 100%;
+  justify-content: flex-end;
 }
 
-.btn-primary:active {
-  filter: brightness(0.95);
+.text-action {
+  padding: 0;
+  color: var(--ds-accent-blue);
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
 }
 
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.text-action:hover {
+  text-decoration: underline;
 }
 
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
-  transform: translateY(-1px);
-}
-
-.btn-danger {
-  background: linear-gradient(135deg, #f87171 0%, #fb9090 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
-}
-
-.btn-danger:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(248, 113, 113, 0.4);
-  background: linear-gradient(135deg, #fb9090 0%, #f87171 100%);
-}
-
-/* 动画效果 */
-@keyframes pulse-icon {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-@keyframes glow-green {
-  from {
-    box-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
-  }
+@keyframes update-spin {
   to {
-    box-shadow: 0 0 20px rgba(52, 211, 153, 0.6);
+    transform: rotate(360deg);
   }
 }
 
-@keyframes success-pulse {
-  0% {
-    transform: scale(1);
+@media (prefers-reduced-motion: reduce) {
+  .dialog-fade-enter-active,
+  .dialog-fade-leave-active,
+  .dialog-fade-enter-active .update-container,
+  .dialog-fade-leave-active .update-container,
+  .progress-fill,
+  .btn,
+  .close-btn {
+    transition: none;
   }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
+
+  .status-spinner {
+    animation: none;
   }
 }
 
-@keyframes error-shake {
-  0%,
-  100% {
-    transform: translateX(0);
+@media (max-width: 520px) {
+  .dialog-overlay {
+    padding: 16px;
   }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
-}
 
-@keyframes pulse-ring {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(2.5);
-    opacity: 0;
-  }
-}
-
-@keyframes shine {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 100%;
-  }
-}
-
-@keyframes success-bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-10px);
-  }
-  60% {
-    transform: translateY(-5px);
-  }
-}
-
-@keyframes error-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* 响应式设计 */
-@media (max-width: 480px) {
   .update-container {
-    margin: 20px;
-    border-radius: 12px;
+    width: min(100%, calc(100vw - 32px));
   }
 
-  .update-header {
-    padding: 20px 20px 16px;
-  }
-
-  .update-content {
-    padding: 20px;
-  }
-
+  .update-header,
+  .update-content,
   .update-footer {
-    padding: 16px 20px 20px;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .download-stats {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
   }
 
   .footer-actions {
+    align-items: stretch;
     flex-direction: column;
   }
 
   .btn {
     width: 100%;
+  }
+
+  .error-manual-actions {
+    justify-content: center;
+  }
+
+  .error-footer-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

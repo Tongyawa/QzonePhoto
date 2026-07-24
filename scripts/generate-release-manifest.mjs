@@ -20,6 +20,7 @@ const publicBaseUrl = (args.publicBaseUrl || process.env.R2_PUBLIC_BASE_URL || '
   ''
 )
 const githubRepo = args.githubRepo || '11273/QzonePhoto'
+const generatedAt = resolveGeneratedAt(args.generatedAt)
 
 const files = await listFiles(artifactsDir)
 const releaseFiles = files.filter((file) => /\.(exe|dmg|zip|AppImage|deb)$/i.test(file))
@@ -48,7 +49,7 @@ for (const file of releaseFiles) {
 const manifest = {
   version,
   tag,
-  generatedAt: new Date().toISOString(),
+  generatedAt,
   githubReleaseUrl: tag
     ? `https://github.com/${githubRepo}/releases/tag/${tag}`
     : `https://github.com/${githubRepo}/releases/latest`,
@@ -57,6 +58,15 @@ const manifest = {
 
 await writeFile(outFile, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 console.log(`Wrote ${outFile} with ${assets.length} assets`)
+
+function resolveGeneratedAt(value) {
+  if (!value) return new Date().toISOString()
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error(`Invalid manifest generatedAt timestamp: ${value}`)
+  }
+  return timestamp.toISOString()
+}
 
 async function listFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true })
