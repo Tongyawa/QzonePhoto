@@ -1,0 +1,22 @@
+# 企鹅相册 · QzonePhoto
+
+> 一个开源的桌面端工具，用于把 QQ 空间中有权访问的相册、照片、视频和动态整理并下载到自己的电脑。支持 Windows、macOS 和 Linux；内容在桌面端本地处理。
+
+## 主要页面
+
+- [首页与下载](https://qzonephoto.getgit.one/): 自动推荐适合当前电脑的安装包，也可以手动选择系统和版本。
+- [功能介绍](https://qzonephoto.getgit.one/features/): 相册、原图、照片、视频、动态、上传和下载整理功能。
+- [使用帮助](https://qzonephoto.getgit.one/privacy/): 版本选择、macOS 首次打开、本地处理方式和问题反馈说明。
+
+## 核心事实
+
+- 产品名称：企鹅相册 · QzonePhoto。
+- 使用方式：下载桌面应用后，在自己的电脑上完成浏览、整理和下载。
+- 支持内容：相册、照片、原图、视频、动态和好友空间中有权访问的内容。
+- 支持系统：Windows、macOS、Linux。
+- 获取方式：通过官网 qzonephoto.getgit.one 下载；源码与发布记录见 GitHub 项目页。
+
+## 重要链接
+
+- [GitHub 源代码与发布记录](https://github.com/11273/QzonePhoto)
+- [问题反馈](https://github.com/11273/QzonePhoto/issues)

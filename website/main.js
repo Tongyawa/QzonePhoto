@@ -9,15 +9,20 @@
     manifestUrls: manifestUrls(),
     siteVersion: '2026.07.12'
   }
+  const MANIFEST_REQUEST_TIMEOUT_MS = 1800
+  const MANIFEST_TOTAL_TIMEOUT_MS = 3400
   const state = {
     sessionId: sessionId(),
     visitorId: visitorId(),
     manifest: core.normalizeManifest(null),
     manifestSource: 'loading',
+    manifestSettled: false,
     platform: core.detectPlatform({
       platform: navigator.userAgentData?.platform || navigator.platform,
       userAgent: navigator.userAgent
     }),
+    choicePlatform: null,
+    choicePlatformTouched: false,
     recommendedAsset: null,
     pageStartedAt: performance.now(),
     maxScrollPercent: 0,
@@ -25,15 +30,17 @@
   }
 
   setupNavigation()
+  setupScrollChrome()
   setupReveal()
   setupChoices()
   setupDownloadLinks()
   setupOutboundTracking()
   setupFaqTracking()
   setupEngagementTracking()
+  setManifestStatus('loading')
   renderPlatform(state.platform)
   loadHighEntropyPlatform()
-  loadManifest()
+  void loadManifest().catch(settleManifestFallback)
   track('website_visit', { source: pageName(), status: 'viewed', stage: 'visit' }, true)
 
   function setupEngagementTracking() {
@@ -86,6 +93,44 @@
       toggle.setAttribute('aria-expanded', 'false')
       toggle.setAttribute('aria-label', '打开导航')
     })
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      nav.classList.remove('open')
+      toggle.setAttribute('aria-expanded', 'false')
+      toggle.setAttribute('aria-label', '打开导航')
+    })
+
+    if (document.body.dataset.page !== 'home') return
+    const links = Array.from(nav.querySelectorAll('a[href^="#"]'))
+    const sections = links
+      .map((link) => ({ link, section: document.querySelector(link.getAttribute('href')) }))
+      .filter((item) => item.section)
+      .sort((a, b) => a.section.offsetTop - b.section.offsetTop)
+    if (!sections.length) return
+    const syncActiveSection = () => {
+      const current = sections
+        .filter(({ section }) => section.getBoundingClientRect().top <= innerHeight * 0.42)
+        .at(-1)
+      links.forEach((link) => link.removeAttribute('aria-current'))
+      current?.link.setAttribute('aria-current', 'location')
+    }
+    syncActiveSection()
+    window.addEventListener('scroll', syncActiveSection, { passive: true })
+  }
+
+  function setupScrollChrome() {
+    let scheduled = false
+    const update = () => {
+      document.body.classList.toggle('has-scrolled', scrollY > 12)
+      scheduled = false
+    }
+    const requestUpdate = () => {
+      if (scheduled) return
+      scheduled = true
+      requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', requestUpdate, { passive: true })
   }
 
   function setupReveal() {
@@ -119,6 +164,25 @@
       if (!panel) return
       button.addEventListener('click', () => setChoiceOpen(button, panel, panel.hidden))
     })
+    document.querySelectorAll('[data-platform-tab]').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        setChoicePlatform(tab.dataset.platformTab, true)
+      })
+      tab.addEventListener('keydown', (event) => {
+        const tabs = Array.from(tab.closest('[role="tablist"]')?.querySelectorAll('[data-platform-tab]') || [])
+        const currentIndex = tabs.indexOf(tab)
+        if (currentIndex < 0) return
+        let nextIndex = currentIndex
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+        else if (event.key === 'Home') nextIndex = 0
+        else if (event.key === 'End') nextIndex = tabs.length - 1
+        else return
+        event.preventDefault()
+        tabs[nextIndex].focus()
+        tabs[nextIndex].click()
+      })
+    })
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return
       document.querySelectorAll('[data-platform-choice]:not([hidden])').forEach((panel) => {
@@ -129,18 +193,48 @@
   }
 
   function setChoiceOpen(button, panel, open) {
-    panel.hidden = !open
+    panel.getAnimations?.().forEach((animation) => {
+      try {
+        animation.commitStyles?.()
+      } catch {
+        // Older browsers can still cancel the animation safely.
+      }
+      animation.cancel()
+    })
     button.setAttribute('aria-expanded', String(open))
     if (open) {
-      const recommended = state.recommendedAsset
-        ? panel.querySelector(`[data-download="${state.recommendedAsset}"]`)
-        : null
-      const focusTarget =
-        recommended ||
-        panel.querySelector('.current-platform [data-download]') ||
-        panel.querySelector('a')
-      focusTarget?.focus()
+      panel.hidden = false
+      panel.inert = false
+      panel.setAttribute('aria-hidden', 'false')
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        panel.animate(
+          [
+            { opacity: 0, transform: 'translateY(-6px)' },
+            { opacity: 1, transform: 'translateY(0)' }
+          ],
+          { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'both' }
+        )
+      }
+      return
     }
+    panel.inert = true
+    panel.setAttribute('aria-hidden', 'true')
+    if (panel.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      panel.hidden = true
+      return
+    }
+    panel
+      .animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-4px)' }
+        ],
+        { duration: 160, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'both' }
+      )
+      .finished.then(() => {
+        if (button.getAttribute('aria-expanded') === 'false') panel.hidden = true
+      })
+      .catch(() => {})
   }
 
   function setupDownloadLinks() {
@@ -219,7 +313,7 @@
   function renderPlatform(platform) {
     state.platform = platform
     state.recommendedAsset = core.recommendAsset(platform)
-    sortPlatformChoices(platform)
+    syncChoicePlatform(platform)
     const smartLinks = document.querySelectorAll('[data-smart-download]')
 
     smartLinks.forEach((link) => {
@@ -234,7 +328,7 @@
       if (platform.os === 'macos' && !state.recommendedAsset) {
         link.dataset.needsChoice = 'true'
         setLinkCopy(link, '选择 Mac 芯片版本', 'Apple 芯片或 Intel')
-        setStatus(link, '浏览器无法可靠判断 Mac 芯片，请选择一次')
+        setStatus(link, '先选择你的 Mac 芯片类型，即可开始下载')
         return
       }
 
@@ -271,13 +365,57 @@
     markRecommendedCard()
   }
 
-  function sortPlatformChoices(platform) {
+  function syncChoicePlatform(platform) {
+    const available = ['windows', 'macos', 'linux']
+    if (!state.choicePlatformTouched || !available.includes(state.choicePlatform)) {
+      state.choicePlatform = available.includes(platform.os) ? platform.os : 'windows'
+    }
+    renderChoicePlatform()
+  }
+
+  function setChoicePlatform(platform, userInitiated) {
+    if (!['windows', 'macos', 'linux'].includes(platform)) return
+    state.choicePlatform = platform
+    if (userInitiated) state.choicePlatformTouched = true
+    renderChoicePlatform(userInitiated)
+  }
+
+  function renderChoicePlatform(animate) {
+    const selected = state.choicePlatform || 'windows'
+    const detected = ['windows', 'macos', 'linux'].includes(state.platform.os)
+      ? state.platform.os
+      : ''
+    const labels = { windows: 'Windows', macos: 'macOS', linux: 'Linux' }
+
+    document.querySelectorAll('[data-platform-tab]').forEach((tab) => {
+      const active = tab.dataset.platformTab === selected
+      tab.setAttribute('aria-selected', String(active))
+      tab.tabIndex = active ? 0 : -1
+      tab.classList.toggle('current-platform', tab.dataset.platformTab === detected)
+    })
     document.querySelectorAll('[data-platform-group]').forEach((group) => {
-      const current = group.dataset.platformGroup === platform.os
-      group.classList.toggle('current-platform', current)
-      group.querySelectorAll('[data-download]').forEach((link) => {
-        link.style.order = link.dataset.download === state.recommendedAsset ? '0' : '1'
-      })
+      const active = group.dataset.platformGroup === selected
+      group.hidden = !active
+      group.setAttribute('aria-hidden', String(!active))
+      if (
+        active &&
+        animate &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        group.getAnimations?.().forEach((animation) => animation.cancel())
+        group.animate(
+          [
+            { opacity: 0, transform: 'translateY(4px)' },
+            { opacity: 1, transform: 'translateY(0)' }
+          ],
+          { duration: 180, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'both' }
+        )
+      }
+    })
+    document.querySelectorAll('[data-choice-context]').forEach((item) => {
+      item.textContent = detected
+        ? `已识别当前电脑：${labels[detected]}。也可以切换到其他系统。`
+        : '不确定时，先选择你的电脑系统。'
     })
   }
 
@@ -296,33 +434,71 @@
   }
 
   async function loadManifest() {
-    for (const url of config.manifestUrls) {
-      try {
-        const controller = new AbortController()
-        const timeout = window.setTimeout(() => controller.abort(), 2800)
-        const response = await fetch(url, {
+    const deadline = window.setTimeout(() => settleManifestFallback(), MANIFEST_TOTAL_TIMEOUT_MS)
+    try {
+      for (const url of config.manifestUrls) {
+        if (state.manifestSettled) break
+        try {
+          const manifest = await fetchManifest(url)
+          if (!manifest.assets.length) continue
+          acceptManifest(manifest, url)
+          return
+        } catch {
+          // Try the next manifest source, then fall back to verified GitHub URLs.
+        }
+      }
+      settleManifestFallback()
+    } finally {
+      window.clearTimeout(deadline)
+    }
+  }
+
+  async function fetchManifest(url) {
+    const controller = new AbortController()
+    let timeout = 0
+    try {
+      const response = await new Promise((resolve, reject) => {
+        timeout = window.setTimeout(() => {
+          controller.abort()
+          reject(new Error('manifest request timed out'))
+        }, MANIFEST_REQUEST_TIMEOUT_MS)
+        fetch(url, {
           headers: { Accept: 'application/json' },
           credentials: 'omit',
           signal: controller.signal
-        })
-        window.clearTimeout(timeout)
-        if (!response.ok) continue
-        const manifest = core.normalizeManifest(await response.json())
-        if (!manifest.assets.length && url.startsWith('http')) continue
-        state.manifest = manifest
-        state.manifestSource = url.startsWith('http') ? 'r2' : 'local'
-        patchManifestData()
-        setManifestStatus('ready')
-        renderPlatform(state.platform)
-        return
-      } catch {
-        // Try the next manifest source, then fall back to verified GitHub URLs.
-      }
+        }).then(resolve, reject)
+      })
+      if (!response.ok) throw new Error(`manifest request failed: ${response.status}`)
+      return core.normalizeManifest(await response.json())
+    } finally {
+      window.clearTimeout(timeout)
     }
+  }
+
+  function acceptManifest(manifest, url) {
+    if (state.manifestSettled) return
+    state.manifest = manifest
+    state.manifestSource = url.startsWith('http') ? 'r2' : 'local'
+    setManifestStatus('ready')
+    refreshManifestPresentation()
+    renderPlatform(state.platform)
+  }
+
+  function settleManifestFallback() {
+    if (state.manifestSettled) return
     state.manifestSource = 'fallback'
     setManifestStatus('fallback')
-    patchGithubFallbacks()
+    refreshManifestPresentation()
     renderPlatform(state.platform)
+  }
+
+  function refreshManifestPresentation() {
+    try {
+      patchManifestData()
+    } catch {
+      // Downloading does not depend on version copy. Keep the primary button usable.
+      patchGithubReleaseLinks()
+    }
   }
 
   function patchManifestData() {
@@ -342,7 +518,7 @@
           ]
             .filter(Boolean)
             .join(' · ')
-        : '可直接下载，也可以查看全部安装包'
+        : '可直接下载；完整版本列表可在 GitHub 查看'
     })
     patchGithubReleaseLinks()
     patchGithubFallbacks()
@@ -363,15 +539,18 @@
   }
 
   function setManifestStatus(status) {
+    state.manifestSettled = status !== 'loading'
     setDownloadManifestState(status)
     document.querySelectorAll('[data-manifest-status]').forEach((item) => {
       item.classList.remove('ready', 'fallback')
       if (status === 'ready') {
         item.classList.add('ready')
         item.textContent = state.manifestSource === 'r2' ? '最新版本已连接' : '使用页面内置版本信息'
-      } else {
+      } else if (status === 'fallback') {
         item.classList.add('fallback')
         item.textContent = '版本信息暂时不可用，下载入口仍可使用'
+      } else {
+        item.textContent = '正在确认版本信息'
       }
     })
   }
@@ -379,6 +558,7 @@
   function setDownloadManifestState(status) {
     document.querySelectorAll('[data-download-shell]').forEach((shell) => {
       shell.dataset.manifestState = status
+      shell.setAttribute('aria-busy', String(status === 'loading'))
     })
   }
 
@@ -419,8 +599,8 @@
     const versionCopy = state.manifest.version
       ? `v${state.manifest.version}`
       : state.manifestSource === 'fallback'
-        ? '版本信息暂时不可用'
-        : '正在获取最新版本'
+        ? '可直接下载'
+        : '正在确认最新版本'
     return [versionCopy, manifestAsset?.size ? formatBytes(manifestAsset.size) : '', fallback]
       .filter(Boolean)
       .join(' · ')
