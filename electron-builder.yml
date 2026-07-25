@@ -101,6 +101,9 @@ mac:
 dmg:
   artifactName: QzonePhoto-${version}-${os}-${arch}.${ext} # DMG包命名格式
   format: UDZO
+  # GitHub macos-14 的 dmgbuild 偶发在 hdiutil 自动收缩阶段失败；保留已创建的镜像，
+  # 不影响 DMG 挂载、安装或更新包校验，并避免因构建机工具链波动中断整次发布。
+  shrink: false
 
 # AppImage配置
 appImage:
