@@ -1,5 +1,4 @@
 import router from './router'
-import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress' // progress bar
 import 'nprogress/nprogress.css' // progress bar style
 import { useUserStore } from './store/user.store'
@@ -9,7 +8,7 @@ NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
 const whiteList = ['/login'] // no redirect whitelist
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
   // start progress bar
   NProgress.start()
 
@@ -23,18 +22,10 @@ router.beforeEach(async (to, from, next) => {
       next({ path: '/' })
       NProgress.done()
     } else {
-      if (userStore.userInfo?.uin) {
-        next()
-      } else {
-        try {
-          await userStore.getUserInfo()
-          next({ ...to, replace: true })
-        } catch (error) {
-          ElMessage.error(error || 'Has Error')
-          next(`/login`)
-          NProgress.done()
-        }
-      }
+      // 只要本地仍有登录态，就先进入应用。网络校验会在后台完成；
+      // 不能让 QQ 接口、系统代理或抓包软件的超时把整个 RouterView 卡成空白。
+      void userStore.initFromLocal()
+      next()
     }
   } else {
     if (whiteList.indexOf(to.path) !== -1) {

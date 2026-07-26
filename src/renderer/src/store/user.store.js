@@ -11,6 +11,9 @@ export const useUserStore = defineStore('user', () => {
   const qzPSkey = ref(demoMode ? 'demo-p-skey' : '')
   const qzUin = ref(demoMode ? '100012026' : '')
   const qzCookies = ref({})
+  const isRestoringSession = ref(false)
+  const sessionRestoreError = ref('')
+  let restorePromise = null
 
   const plainCookies = (cookies = {}) =>
     Object.fromEntries(
@@ -35,60 +38,81 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // 初始化时从本地存储恢复
-  const initFromLocal = async () => {
-    if (demoMode) {
-      const res = await window.QzoneAPI.fetchUserInfo()
-      userInfo.value = res.data
-      return
-    }
-    const { p_skey, uin, cookies } = getLocalUserInfo()
-    qzPSkey.value = p_skey
-    qzUin.value = uin
-    qzCookies.value = cookies || {}
-    await syncQzoneWindowAuth()
+  const clearStoredSession = async () => {
+    removeLocalUserInfo()
+    qzPSkey.value = ''
+    qzUin.value = ''
+    qzCookies.value = {}
+    await syncQzoneWindowAuth({ clear: true })
+  }
 
-    // 如果用户已登录，获取用户信息并通知服务
-    if (uin && p_skey) {
+  const isExpiredSessionError = (error) =>
+    error?.code === -3000 || error?.name === 'AuthExpiredError'
+
+  const bindCurrentUser = async (uin, p_skey, profile = userInfo.value) => {
+    try {
+      await window.QzoneAPI.download.setCurrentUser(uin)
+    } catch (error) {
+      console.warn('[UserStore] 设置下载服务用户失败:', error)
+    }
+
+    try {
+      await window.QzoneAPI.upload.setCurrentUser(uin, p_skey, profile?.uin || uin)
+    } catch (error) {
+      console.warn('[UserStore] 设置上传服务用户失败:', error)
+    }
+  }
+
+  // 登录态恢复只做一次。网络短暂不可用、系统代理或抓包证书异常时保留本地登录态，
+  // 让页面先可用；只有明确收到登录过期信号才清除凭证。
+  const initFromLocal = () => {
+    if (restorePromise) return restorePromise
+
+    restorePromise = (async () => {
+      isRestoringSession.value = true
+      sessionRestoreError.value = ''
       try {
-        // 先获取用户详细信息
+        if (demoMode) {
+          const res = await window.QzoneAPI.fetchUserInfo()
+          userInfo.value = res?.data || {}
+          return
+        }
+
+        const { p_skey, uin, cookies } = getLocalUserInfo()
+        qzPSkey.value = p_skey || ''
+        qzUin.value = uin || ''
+        qzCookies.value = cookies || {}
+        await syncQzoneWindowAuth()
+
+        if (!uin || !p_skey) return
+
         const res = await withTimeout(
           window.QzoneAPI.fetchUserInfo(p_skey, uin),
           USER_INFO_TIMEOUT_MS,
-          '恢复登录态超时，请重新登录'
+          '恢复登录态超时'
         )
-        if (res.code === 0) {
-          userInfo.value = res.data
-
-          // 通知下载和上传服务当前用户
-          try {
-            await window.QzoneAPI.download.setCurrentUser(uin)
-          } catch (error) {
-            console.warn('[UserStore] 设置下载服务用户失败:', error)
-          }
-
-          try {
-            await window.QzoneAPI.upload.setCurrentUser(uin, p_skey, userInfo.value.uin)
-          } catch (error) {
-            console.warn('[UserStore] 设置上传服务用户失败:', error)
-          }
-        } else {
-          // 如果获取用户信息失败，清除本地登录信息
-          removeLocalUserInfo()
-          qzPSkey.value = ''
-          qzUin.value = ''
-          qzCookies.value = {}
-          await syncQzoneWindowAuth({ clear: true })
+        if (res?.code !== 0) {
+          const error = new Error(res?.message || '登录态校验失败')
+          error.code = res?.code
+          throw error
         }
+
+        userInfo.value = res.data || {}
+        await bindCurrentUser(uin, p_skey, userInfo.value)
       } catch (error) {
-        console.warn('[UserStore] 恢复登录信息时获取用户信息失败:', error)
-        // 如果获取用户信息失败，清除本地登录信息
-        removeLocalUserInfo()
-        qzPSkey.value = ''
-        qzUin.value = ''
-        qzCookies.value = {}
-        await syncQzoneWindowAuth({ clear: true })
+        if (isExpiredSessionError(error)) {
+          await clearStoredSession()
+        } else {
+          sessionRestoreError.value = error?.message || '暂时无法验证登录状态'
+          console.warn('[UserStore] 暂时无法恢复登录态，保留本地登录信息:', error)
+        }
+      } finally {
+        isRestoringSession.value = false
+        restorePromise = null
       }
-    }
+    })()
+
+    return restorePromise
   }
 
   // 启动时异步初始化
@@ -106,31 +130,19 @@ export const useUserStore = defineStore('user', () => {
         USER_INFO_TIMEOUT_MS,
         '获取用户信息超时，请重新登录'
       )
-      if (res.code === 0) {
+      if (res?.code === 0) {
         userInfo.value = res.data
-
-        // 通知下载和上传服务当前用户
-        try {
-          await window.QzoneAPI.download.setCurrentUser(qzUin.value)
-        } catch (error) {
-          console.warn('[UserStore] 设置下载服务用户失败:', error)
-        }
-
-        try {
-          await window.QzoneAPI.upload.setCurrentUser(
-            qzUin.value,
-            qzPSkey.value,
-            userInfo.value.uin
-          )
-        } catch (error) {
-          console.warn('[UserStore] 设置上传服务用户失败:', error)
-        }
+        await bindCurrentUser(qzUin.value, qzPSkey.value, userInfo.value)
       } else {
-        throw new Error('获取用户信息失败')
+        const error = new Error(res?.message || '获取用户信息失败')
+        error.code = res?.code
+        throw error
       }
     } catch (error) {
       console.log('getUserInfo error:>> ', error)
-      logout()
+      if (isExpiredSessionError(error)) {
+        await logout()
+      }
       throw error
     }
   }
@@ -176,6 +188,8 @@ export const useUserStore = defineStore('user', () => {
     PSkey: qzPSkey,
     Uin: qzUin,
     isLoggedIn,
+    isRestoringSession,
+    sessionRestoreError,
     getUserInfo,
     login,
     logout,

@@ -36,7 +36,11 @@ export async function pt_get_uins(pt_local_token, olu) {
     try {
       const response = await request.get(url, {
         params,
-        headers
+        headers,
+        // 这是 QQ 客户端本机提供的临时服务，不应该经由系统抓包/代理转发。
+        // 客户端不存在时快速失败，二维码登录仍可正常使用。
+        proxy: false,
+        timeout: 1200
       })
 
       if (response.status === 200 && response.data) {

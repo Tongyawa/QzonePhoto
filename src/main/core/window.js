@@ -2,6 +2,7 @@ import { is } from '@electron-toolkit/utils'
 import { BrowserWindow, screen, session, shell } from 'electron'
 import path, { join } from 'path'
 import { ServiceNames } from '@main/services/service-manager'
+import logger from '@main/core/logger'
 
 const QZONE_PARTITION = 'persist:qzone'
 const QZONE_COOKIE_URLS = [
@@ -215,6 +216,31 @@ export class WindowManager {
     })
 
     this._registerWindow(win, 'main')
+
+    // 保留渲染进程关键错误。页面资源均来自本地，不应因为网络或抓包代理而加载失败；
+    // 一旦出现问题，日志会给出真实原因，避免只留下空白窗口。
+    win.webContents.on(
+      'did-fail-load',
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (!isMainFrame) return
+        logger.error(
+          `[WindowManager] 主界面加载失败 (${errorCode}): ${errorDescription} (${validatedURL || 'unknown'})`
+        )
+      }
+    )
+    win.webContents.on('render-process-gone', (_event, details) => {
+      logger.error(`[WindowManager] 主界面渲染进程已退出: ${details?.reason || 'unknown'}`)
+    })
+    win.webContents.on('preload-error', (_event, preloadPath, error) => {
+      logger.error(`[WindowManager] 预加载脚本异常: ${preloadPath}`, error)
+    })
+    win.webContents.on('console-message', (details) => {
+      // Electron 43 起只使用 details 参数；只收集 warning/error，避免普通日志污染本地诊断文件。
+      if (!['warning', 'error'].includes(details?.level)) return
+      logger.warn(
+        `[Renderer] ${details.sourceId || 'unknown'}:${details.lineNumber || 0} ${String(details.message || '').slice(0, 1200)}`
+      )
+    })
 
     win.on('ready-to-show', () => {
       win.show()

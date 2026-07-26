@@ -112,6 +112,13 @@ app.whenReady().then(async () => {
   }
 })
 
+// 抓包工具的 HTTPS 解密会替换证书。记录原因以便排查，但绝不绕过证书校验；
+// 本地界面和已有本地登录态不会因此被阻塞。
+app.on('certificate-error', (_event, _webContents, url, error, _certificate, callback) => {
+  logger.warn(`[网络] HTTPS 证书校验失败: ${url} (${error})`)
+  callback(false)
+})
+
 function getLocalMediaMimeType(filePath) {
   switch (path.extname(filePath).toLowerCase()) {
     case '.webm':

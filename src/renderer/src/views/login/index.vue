@@ -110,6 +110,7 @@ const qrcodeInfo = ref({})
 let qrTimer = null // 用于二维码刷新
 let scanTimer = null // 用于监听扫码状态
 let localAccountsTimer = null // 用于定时刷新本地账号列表
+let localAccountsLoading = false
 const localAccounts = ref([]) // 本地账号列表
 const isLoggingIn = ref(false) // 专门用于头像登录的等待状态
 const loginMessage = ref('正在登录中...')
@@ -301,12 +302,19 @@ const checkScanStatus = () => {
 
 // 获取本地账号列表
 const getLocalAccounts = async () => {
+  if (localAccountsLoading) return
+  localAccountsLoading = true
   try {
     const accounts = await window.QzoneAPI.getLocalUnis()
     console.debug('getLocalAccounts :>> ', accounts)
-    mergeLocalAccounts(accounts || [])
+    // 代理、网络或本机 QQ 未启动时，保留已展示的账号；空数组才代表本机确实没有账号。
+    if (Array.isArray(accounts)) {
+      mergeLocalAccounts(accounts)
+    }
   } catch (err) {
     console.error('获取本地账号失败:', err)
+  } finally {
+    localAccountsLoading = false
   }
 }
 
@@ -317,10 +325,10 @@ const startLocalAccountsPolling = () => {
     clearInterval(localAccountsTimer)
   }
 
-  // 本地头像接口偶发失败，轮询不用太密，避免头像和列表抖动
+  // 账号切换无需秒级探测；降低对本机 QQ 服务与抓包工具的干扰。
   localAccountsTimer = setInterval(() => {
     getLocalAccounts()
-  }, 5000)
+  }, 30000)
 }
 
 const handleWindowFocus = () => {

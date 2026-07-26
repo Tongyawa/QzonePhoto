@@ -9,6 +9,7 @@ export class QzoneAuthService {
   constructor() {
     this.token = null
     this.localFaceCache = new Map()
+    this.localAccountsPromise = null
   }
 
   isValidLocalFace(face) {
@@ -16,6 +17,18 @@ export class QzoneAuthService {
   }
 
   async getLocalUnis() {
+    // 登录页的挂载、窗口聚焦和定时刷新可能同时触发扫描。复用同一请求，避免重复探测本机 QQ 服务。
+    if (this.localAccountsPromise) return this.localAccountsPromise
+
+    this.localAccountsPromise = this._getLocalUnis()
+    try {
+      return await this.localAccountsPromise
+    } finally {
+      this.localAccountsPromise = null
+    }
+  }
+
+  async _getLocalUnis() {
     // logger.info('[getLocalUnis] 开始获取本地 UIN 列表')
 
     try {

@@ -15,6 +15,15 @@ TODO
 const SENSITIVE_KEYS = ['password', 'token', 'creditCard']
 const REDACTED_TEXT = '​**​*REDACTED​**​*'
 const DEV_LOG_PATH = path.join(app.getPath('userData'), 'qzone-helper-dev.log')
+let consoleOutputUnavailable = false
+
+// Electron 从终端/IDE 分离时，stdout 或 stderr 可能已经关闭。若仍向 console 写入，
+// Node 会持续抛出 EPIPE，甚至把正常的启动错误淹没。日志文件仍是唯一可靠的诊断来源。
+for (const stream of [process.stdout, process.stderr]) {
+  stream?.on?.('error', (error) => {
+    if (error?.code === 'EPIPE') consoleOutputUnavailable = true
+  })
+}
 
 // 日志级别定义
 const LOG_LEVELS = {
@@ -154,19 +163,25 @@ class Logger {
 
     const fullLogMessage = logParts.join(' ')
 
-    // 根据日志级别使用不同的console方法
-    switch (data.level) {
-      case 'error':
-        console.error(fullLogMessage)
-        break
-      case 'warn':
-        console.warn(fullLogMessage)
-        break
-      case 'debug':
-        console.debug(fullLogMessage)
-        break
-      default:
-        console.log(fullLogMessage)
+    // 根据日志级别使用不同的 console 方法。控制台不可写时仍继续写本地日志。
+    if (!consoleOutputUnavailable) {
+      try {
+        switch (data.level) {
+          case 'error':
+            console.error(fullLogMessage)
+            break
+          case 'warn':
+            console.warn(fullLogMessage)
+            break
+          case 'debug':
+            console.debug(fullLogMessage)
+            break
+          default:
+            console.log(fullLogMessage)
+        }
+      } catch (error) {
+        if (error?.code === 'EPIPE') consoleOutputUnavailable = true
+      }
     }
     try {
       fs.appendFileSync(DEV_LOG_PATH, fullLogMessage + '\n')
