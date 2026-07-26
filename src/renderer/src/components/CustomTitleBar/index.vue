@@ -580,6 +580,8 @@ const beginUpdateCheckRequest = (background) => {
   clearUpdateCheckUiTimer()
   updateCheckUiTimer = setTimeout(() => {
     if (!isUpdateCheckRequestPending.value || !updateState.checking) return
+    // 网络请求尚未结束时，不再让标题栏永久保持“检查中”，并允许稍后重新检查。
+    isUpdateCheckRequestPending.value = false
     updateState.checking = false
     if (!background) showVersionCheckFeedback('slow')
   }, UPDATE_CHECK_UI_TIMEOUT_MS)
@@ -1155,7 +1157,12 @@ watch([dialogVisible, noticeVisible], () => {
 <style scoped>
 .custom-title-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /*
+   * 两侧命令区以自身内容作为最小宽度，再平分其余空间。
+   * 这样版本检查等短暂状态可以自然向右展开，不会因左右列被压缩而截断；
+   * 同时中间标题仍维持在窗口的视觉中心。
+   */
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   column-gap: 10px;
   align-items: center;
   height: 36px;
@@ -1185,7 +1192,8 @@ watch([dialogVisible, noticeVisible], () => {
   flex-shrink: 0;
   min-width: 0;
   z-index: 2;
-  overflow: hidden;
+  /* 更新状态应优先完整显示；中间标题在空间不足时可以让位。 */
+  overflow: visible;
 }
 
 .is-mac .title-bar-left {
@@ -1258,8 +1266,8 @@ watch([dialogVisible, noticeVisible], () => {
 .version-download-group {
   display: flex;
   align-items: center;
-  min-width: 0;
-  flex: 0 1 auto;
+  min-width: max-content;
+  flex: 0 0 auto;
 }
 
 .title-feedback-btn {
@@ -1617,11 +1625,11 @@ watch([dialogVisible, noticeVisible], () => {
   }
 
   .version-container {
-    width: 54px;
-    min-width: 54px;
-    flex-basis: 54px;
+    width: auto;
+    min-width: 0;
+    flex-basis: auto;
     justify-content: flex-start;
-    padding: 0 4px 0 2px;
+    padding: 0 5px 0 2px;
   }
 
   .version-container.downloading,
@@ -1775,9 +1783,9 @@ watch([dialogVisible, noticeVisible], () => {
   justify-content: center;
   gap: 0;
   height: 20px;
-  width: 66px;
-  min-width: 66px;
-  flex: 0 0 66px;
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
   position: relative;
   cursor: pointer;
   transition:
@@ -1790,7 +1798,7 @@ watch([dialogVisible, noticeVisible], () => {
   -webkit-backdrop-filter: none;
   color: var(--ds-text-secondary);
   font: inherit;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: none;
 }
 
@@ -1817,7 +1825,8 @@ watch([dialogVisible, noticeVisible], () => {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 0;
+  min-width: max-content;
+  flex: 0 0 auto;
 }
 
 .app-version-content.checking {
@@ -1829,7 +1838,8 @@ watch([dialogVisible, noticeVisible], () => {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 0;
+  min-width: max-content;
+  flex: 0 0 auto;
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
@@ -2040,6 +2050,16 @@ watch([dialogVisible, noticeVisible], () => {
   width: 11px;
   height: 11px;
   flex-basis: 11px;
+}
+
+@media (max-width: 760px) {
+  .title-bar-center {
+    display: none;
+  }
+
+  .title-bar-left {
+    grid-column: 1 / 3;
+  }
 }
 
 .checking-spinner {

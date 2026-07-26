@@ -1,9 +1,6 @@
-// import { is } from '@electron-toolkit/utils'
-// import { format } from 'date-fns'
 import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
-// import log from 'electron-log/main'
 
 /*
 TODO

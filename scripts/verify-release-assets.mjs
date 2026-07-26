@@ -92,7 +92,7 @@ export async function verifyReleaseAssets({ assetsDir, version }) {
     ])
   ].sort()
 
-  return { version, assetCount: expectedAssets.length, fileNames }
+  return { version, assetCount: metadataAssets.size, fileNames }
 }
 
 async function verifyMetadata({ metadataPath, directory, version, requiredAssets, allowedAssets }) {
@@ -130,7 +130,31 @@ async function verifyMetadata({ metadataPath, directory, version, requiredAssets
     }
   }
 
+  verifyDefaultMetadataAsset(content, entries, metadataPath)
+
   return entries.keys()
+}
+
+function verifyDefaultMetadataAsset(content, entries, metadataPath) {
+  const match = String(content).match(/^path:\s*([^\r\n]+)\r?\nsha512:\s*([^\r\n]+)$/m)
+  if (!match) {
+    throw new Error(
+      `Updater metadata ${path.basename(metadataPath)} is missing its default path and SHA-512`
+    )
+  }
+
+  const [pathValue, sha512] = [match[1].trim(), match[2].trim()]
+  const file = entries.get(pathValue)
+  if (!file) {
+    throw new Error(
+      `Updater metadata ${path.basename(metadataPath)} default path is not present in files: ${pathValue}`
+    )
+  }
+  if (file.sha512 !== sha512) {
+    throw new Error(
+      `Updater metadata ${path.basename(metadataPath)} default SHA-512 does not match ${pathValue}`
+    )
+  }
 }
 
 function parseMetadataEntries(content, metadataPath) {

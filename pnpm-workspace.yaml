@@ -1,9 +1,13 @@
+overrides:
+  form-data: 4.0.6
+  js-yaml: ^4.3.0
+  postcss: ^8.5.18
+
 allowBuilds:
   electron: true
   electron-winstaller: true
   javascript-obfuscator: true
   sharp: true
-  asarmor: true
   ffmpeg-static: true
   esbuild: false
   vue-demi: false

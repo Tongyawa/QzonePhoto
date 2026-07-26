@@ -97,6 +97,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Verify release promotion logic
+        run: node --test scripts/*.test.mjs
+
       - name: Download matching public release assets
         run: |
           set -euo pipefail
@@ -110,7 +113,7 @@ jobs:
             exit 1
           }
 
-      - name: Generate public download manifest
+      - name: Verify release and prepare its public manifest
         run: |
           set -euo pipefail
           node scripts/verify-release-assets.mjs \
@@ -120,39 +123,27 @@ jobs:
           while IFS= read -r name; do
             cp "artifacts/${name}" "verified-assets/${name}"
           done < verified-release-files.txt
+          node scripts/rebase-update-metadata.mjs \
+            --assets=artifacts --out=stable-update-metadata --releasePath="${RELEASE_TAG}" \
+            --fileList=verified-release-files.txt
           manifest_key="manifests/${RELEASE_TAG}.json"
           candidate_manifest='candidate-release-manifest.json'
           node scripts/generate-release-manifest.mjs \
             --artifacts=verified-assets --out="${candidate_manifest}" --tag="${RELEASE_TAG}" \
-            --releasePath="${RELEASE_TAG}" --publicBaseUrl="${R2_PUBLIC_BASE_URL}" --githubRepo="${GH_REPO}"
+            --releasePath="${RELEASE_TAG}" --publicBaseUrl="${R2_PUBLIC_BASE_URL}" \
+            --githubRepo="${GH_REPO}" --generatedAt="${RELEASE_PUBLISHED_AT}"
           if aws s3api head-object --bucket "${R2_BUCKET}" --key "${manifest_key}" \
             --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
             aws s3 cp "s3://${R2_BUCKET}/${manifest_key}" existing-release-manifest.json \
               --endpoint-url "${R2_ENDPOINT}" --only-show-errors
-            if node -e '
-              const fs = require("node:fs")
-              const [candidatePath, existingPath] = process.argv.slice(1)
-              const candidate = JSON.parse(fs.readFileSync(candidatePath, "utf8"))
-              const existing = JSON.parse(fs.readFileSync(existingPath, "utf8"))
-              if (Number.isNaN(new Date(existing.generatedAt).getTime())) process.exit(2)
-              const normalize = ({ generatedAt, ...value }) => value
-              if (JSON.stringify(normalize(candidate)) !== JSON.stringify(normalize(existing))) process.exit(3)
-            ' "${candidate_manifest}" existing-release-manifest.json
-            then
-              cp existing-release-manifest.json "artifacts/${RELEASE_TAG}.json"
-              echo "Verified and reused existing immutable manifest: ${manifest_key}"
-            else
-              manifest_check_status="$?"
-              if [ "${manifest_check_status}" -eq 2 ]; then
-                echo "Existing immutable manifest has an invalid generatedAt timestamp"
-              elif [ "${manifest_check_status}" -eq 3 ]; then
-                echo "Existing immutable manifest does not match the selected release assets"
-              else
-                echo "Existing immutable manifest could not be verified"
-              fi
-              exit 1
-            fi
+            node scripts/reconcile-release-manifest.mjs \
+              --candidate="${candidate_manifest}" --existing=existing-release-manifest.json
+            # `generatedAt` records the first promotion time only. Reuse a semantically identical
+            # immutable manifest byte-for-byte instead of failing a same-release retry on timestamp.
+            cp existing-release-manifest.json "artifacts/${RELEASE_TAG}.json"
+            echo "Reused the existing immutable manifest for ${RELEASE_TAG}."
           else
+            echo "No prior R2 copy of ${RELEASE_TAG}; this is the first promotion for the tag."
             mv "${candidate_manifest}" "artifacts/${RELEASE_TAG}.json"
           fi
 
@@ -179,31 +170,17 @@ jobs:
       - name: Upload and verify release files, then switch stable metadata
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           upload_and_verify() {
             local file="$1"
             local key="$2"
             local cache_control="$3"
             local content_type="${4:-}"
-            local mutable="${5:-false}"
             local size
             local sha512
             size="$(stat --format=%s "$file")"
             sha512="$(openssl dgst -sha512 -binary "$file" | base64 -w0)"
-            if [ "${mutable}" != 'true' ] && aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
-              --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
-              remote_size="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
-                --endpoint-url "${R2_ENDPOINT}" --query ContentLength --output text)"
-              remote_sha512="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
-                --endpoint-url "${R2_ENDPOINT}" --query 'Metadata."qzone-sha512"' --output text)"
-              test "${remote_size}" = "${size}" && test "${remote_sha512}" = "${sha512}" || {
-                echo "Refusing to overwrite immutable R2 object with different content: ${key}"
-                exit 1
-              }
-              echo "Verified existing immutable object: ${key}"
-              return
-            fi
-            args=(s3 cp "$file" "s3://${R2_BUCKET}/${key}" --endpoint-url "${R2_ENDPOINT}" --cache-control "${cache_control}" --checksum-algorithm SHA256 --metadata "qzone-sha512=${sha512}" --only-show-errors)
+            args=(s3 cp "$file" "s3://${R2_BUCKET}/${key}" --endpoint-url "${R2_ENDPOINT}" --cache-control "${cache_control}" --metadata "qzone-sha512=${sha512}" --only-show-errors)
             if [ -n "${content_type}" ]; then
               args+=(--content-type "${content_type}")
             fi
@@ -212,37 +189,157 @@ jobs:
               --endpoint-url "${R2_ENDPOINT}" --query ContentLength --output text)"
             remote_sha512="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
               --endpoint-url "${R2_ENDPOINT}" --query 'Metadata."qzone-sha512"' --output text)"
-            test "${remote_size}" = "${size}" && test "${remote_sha512}" = "${sha512}" || {
+            remote_cache_control="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+              --endpoint-url "${R2_ENDPOINT}" --query CacheControl --output text)"
+            normalized_remote_cache_control="$(tr -d '[:space:]' <<<"${remote_cache_control}")"
+            normalized_expected_cache_control="$(tr -d '[:space:]' <<<"${cache_control}")"
+            test "${remote_size}" = "${size}" && test "${remote_sha512}" = "${sha512}" && \
+              test "${normalized_remote_cache_control}" = "${normalized_expected_cache_control}" || {
               echo "R2 object verification failed for ${key}"
-              exit 1
+              return 1
             }
+            if [ -n "${content_type}" ]; then
+              remote_content_type="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+                --endpoint-url "${R2_ENDPOINT}" --query ContentType --output text)"
+              test "${remote_content_type}" = "${content_type}" || {
+                echo "R2 content type verification failed for ${key}"
+                return 1
+              }
+            fi
           }
+
+          upload_immutable_release_object() {
+            local file="$1"
+            local key="$2"
+            local cache_control="$3"
+            local content_type="${4:-}"
+            local size
+            local sha512
+            size="$(stat --format=%s "$file")"
+            sha512="$(openssl dgst -sha512 -binary "$file" | base64 -w0)"
+
+            if aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+              --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
+              remote_size="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+                --endpoint-url "${R2_ENDPOINT}" --query ContentLength --output text)"
+              remote_sha512="$(aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+                --endpoint-url "${R2_ENDPOINT}" --query 'Metadata."qzone-sha512"' --output text)"
+              if [ "${remote_size}" = "${size}" ] && { [ "${remote_sha512}" = 'None' ] || [ -z "${remote_sha512}" ]; }; then
+                # 兼容旧流程上传、没有 qzone-sha512 元数据的历史对象：只在下载后
+                # 确认字节完全相同的前提下，用同一文件补齐元数据与缓存策略。
+                legacy_file="$(mktemp)"
+                aws s3 cp "s3://${R2_BUCKET}/${key}" "${legacy_file}" \
+                  --endpoint-url "${R2_ENDPOINT}" --only-show-errors
+                legacy_sha512="$(openssl dgst -sha512 -binary "${legacy_file}" | base64 -w0)"
+                rm -f "${legacy_file}"
+                test "${legacy_sha512}" = "${sha512}" || {
+                  echo "Refusing to replace published release object with different bytes: ${key}"
+                  return 1
+                }
+                echo "Verified legacy immutable object bytes; repairing its metadata: ${key}"
+                upload_and_verify "${file}" "${key}" "${cache_control}" "${content_type}"
+                return
+              fi
+              test "${remote_size}" = "${size}" && test "${remote_sha512}" = "${sha512}" || {
+                echo "Refusing to replace published release object with different bytes: ${key}"
+                echo "Published versions are immutable for auto-update safety. Create a new patch version instead."
+                return 1
+              }
+              echo "Verified existing immutable object: ${key}"
+              return
+            fi
+
+            upload_and_verify "${file}" "${key}" "${cache_control}" "${content_type}"
+          }
+
+          backup_stable_object() {
+            local key="$1"
+            local backup="$2"
+            if aws s3api head-object --bucket "${R2_BUCKET}" --key "${key}" \
+              --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
+              aws s3 cp "s3://${R2_BUCKET}/${key}" "${backup}" \
+                --endpoint-url "${R2_ENDPOINT}" --only-show-errors
+            else
+              : > "${backup}.absent"
+            fi
+          }
+
+          stable_switched=false
+          stable_committed=false
+          restore_stable_channel() {
+            local failed_status="$1"
+            set +e
+            if [ "${stable_switched}" = 'true' ] && [ "${stable_committed}" != 'true' ]; then
+              echo 'Stable channel verification failed; restoring the previous public pointers.'
+              for name in latest.yml latest-mac.yml latest-linux.yml; do
+                key="releases/latest/${name}"
+                if [ -f "stable-backup/${name}" ]; then
+                  aws s3 cp "stable-backup/${name}" "s3://${R2_BUCKET}/${key}" \
+                    --endpoint-url "${R2_ENDPOINT}" --cache-control 'no-cache, no-store, max-age=0' \
+                    --content-type 'application/x-yaml' --only-show-errors
+                else
+                  aws s3api delete-object --bucket "${R2_BUCKET}" --key "${key}" \
+                    --endpoint-url "${R2_ENDPOINT}" >/dev/null
+                fi
+              done
+              if [ -f stable-backup/latest.json ]; then
+                aws s3 cp stable-backup/latest.json "s3://${R2_BUCKET}/manifests/latest.json" \
+                  --endpoint-url "${R2_ENDPOINT}" --cache-control 'no-cache, no-store, max-age=0' \
+                  --content-type 'application/json' --only-show-errors
+              else
+                aws s3api delete-object --bucket "${R2_BUCKET}" --key 'manifests/latest.json' \
+                  --endpoint-url "${R2_ENDPOINT}" >/dev/null
+              fi
+            fi
+            exit "${failed_status}"
+          }
+          trap 'restore_stable_channel $?' ERR
 
           release_prefix="releases/${RELEASE_TAG}"
           while IFS= read -r name; do
             case "${name}" in
               latest*.yml)
-                upload_and_verify "artifacts/${name}" "${release_prefix}/${name}" \
-                  "no-cache, no-store, max-age=0" "application/x-yaml"
+                upload_immutable_release_object "artifacts/${name}" "${release_prefix}/${name}" \
+                  "public, max-age=31536000, immutable" "application/x-yaml"
                 ;;
               *)
-                upload_and_verify "verified-assets/${name}" "${release_prefix}/${name}" \
+                upload_immutable_release_object "verified-assets/${name}" "${release_prefix}/${name}" \
                   "public, max-age=31536000, immutable"
                 ;;
             esac
           done < verified-release-files.txt
-          upload_and_verify "artifacts/${RELEASE_TAG}.json" "manifests/${RELEASE_TAG}.json" "public, max-age=31536000, immutable" "application/json"
-          echo 'All immutable versioned objects are verified; uploading stable download objects.'
-          while IFS= read -r name; do
-            case "${name}" in
-              latest*.yml) ;;
-              *) upload_and_verify "verified-assets/${name}" "releases/latest/${name}" \
-                "public, max-age=300, must-revalidate" '' true ;;
-            esac
-          done < verified-release-files.txt
+          # The versioned manifest is an inspectable snapshot, not an updater pointer.
+          # It is rebuilt deterministically from the GitHub release's published timestamp.
+          upload_immutable_release_object "artifacts/${RELEASE_TAG}.json" "manifests/${RELEASE_TAG}.json" \
+            "public, max-age=31536000, immutable" "application/json"
+
+          mkdir stable-backup
           for name in latest.yml latest-mac.yml latest-linux.yml; do
-            upload_and_verify "artifacts/${name}" "releases/latest/${name}" \
-              "no-cache, no-store, max-age=0" "application/x-yaml" true
+            backup_stable_object "releases/latest/${name}" "stable-backup/${name}"
           done
+          backup_stable_object 'manifests/latest.json' 'stable-backup/latest.json'
+
+          echo 'Versioned release files are verified. Switching stable updater pointers.'
+          stable_switched=true
+          for name in latest.yml latest-mac.yml latest-linux.yml; do
+            upload_and_verify "stable-update-metadata/${name}" "releases/latest/${name}" \
+              "no-cache, no-store, max-age=0" "application/x-yaml"
+          done
+          # The website follows this pointer. Write it only after all three client
+          # updater pointers have been verified, so the website never advertises a
+          # release whose update metadata is not ready.
           upload_and_verify "artifacts/${RELEASE_TAG}.json" "manifests/latest.json" \
-            "no-cache, no-store, max-age=0" "application/json" true
+            "no-cache, no-store, max-age=0" "application/json"
+          node scripts/audit-r2-release.mjs \
+            --tag="${RELEASE_TAG}" --publicBaseUrl="${R2_PUBLIC_BASE_URL}" --githubRepo="${GH_REPO}"
+          stable_committed=true
+          trap - ERR
+          {
+            echo '### R2 promotion complete'
+            echo
+            echo "- Release: \`${RELEASE_TAG}\`"
+            echo '- Versioned assets were uploaded once and verified by size plus SHA-512 metadata.'
+            echo '- Re-running an unchanged tag is idempotent; changed published assets are rejected.'
+            echo '- All three updater pointers were switched before the website manifest, then the public domain was audited.'
+            echo '- If the final public audit fails, the previous stable pointers are restored automatically.'
+          } >> "${GITHUB_STEP_SUMMARY}"
