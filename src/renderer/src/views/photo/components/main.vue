@@ -55,12 +55,7 @@
                 @click="handlePhotoClick(photo, $event, index)"
               >
                 <div class="photo-wrapper">
-                  <el-image
-                    :src="photo.pre"
-                    fit="cover"
-                    class="photo-image"
-                    lazy
-                  >
+                  <el-image :src="photo.pre" fit="cover" class="photo-image" lazy>
                     <template #error>
                       <div class="image-error">
                         <el-icon><Picture /></el-icon>
@@ -156,7 +151,9 @@
                 复制链接
               </el-button>
             </el-tooltip>
-            <el-button v-if="!isFriendContext" size="small" type="danger" @click="deleteSelected">删除选中</el-button>
+            <el-button v-if="!isFriendContext" size="small" type="danger" @click="deleteSelected"
+              >删除选中</el-button
+            >
             <el-button size="small" type="primary" @click="downloadSelected">下载选中</el-button>
           </div>
         </div>
@@ -191,13 +188,30 @@
       <div class="access-dialog-content">
         <div class="access-icon">
           <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="8" y="20" width="32" height="24" rx="4" stroke="currentColor" stroke-width="2.5" fill="none"/>
-            <path d="M16 20V14a8 8 0 1 1 16 0v6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-            <circle cx="24" cy="32" r="3" fill="currentColor"/>
-            <path d="M24 35v3" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <rect
+              x="8"
+              y="20"
+              width="32"
+              height="24"
+              rx="4"
+              stroke="currentColor"
+              stroke-width="2.5"
+              fill="none"
+            />
+            <path
+              d="M16 20V14a8 8 0 1 1 16 0v6"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              fill="none"
+            />
+            <circle cx="24" cy="32" r="3" fill="currentColor" />
+            <path d="M24 35v3" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
           </svg>
         </div>
-        <h3 class="access-title">{{ accessDialogData.isQuestion ? '请回答问题' : '请输入密码' }}</h3>
+        <h3 class="access-title">
+          {{ accessDialogData.isQuestion ? '请回答问题' : '请输入密码' }}
+        </h3>
         <p class="access-desc" v-if="accessDialogData.isQuestion">
           主人提问：<strong>{{ accessDialogData.question }}</strong>
         </p>
@@ -215,7 +229,13 @@
         <p v-if="accessDialogData.error" class="access-error">{{ accessDialogData.error }}</p>
         <div class="access-actions">
           <el-button @click="handleAccessCancel" class="access-btn cancel-btn">取消</el-button>
-          <el-button type="primary" @click="handleAccessConfirm" :loading="accessDialogData.loading" class="access-btn confirm-btn">确定</el-button>
+          <el-button
+            type="primary"
+            @click="handleAccessConfirm"
+            :loading="accessDialogData.loading"
+            class="access-btn confirm-btn"
+            >确定</el-button
+          >
         </div>
       </div>
     </el-dialog>
@@ -239,13 +259,14 @@ import Top from './top.vue'
 import { generateUniqueAlbumName } from '@renderer/utils'
 import { createPaginationGuard } from '@renderer/utils/paginationGuard'
 import { findCachedFeedMetadata } from '@renderer/utils/feed-description-cache'
+import { resolveQzoneHostUin, resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 
 const userStore = useUserStore()
 const downloadStore = useDownloadStore()
 
 // 支持好友相册查看：通过 inject 接收外部 hostUin 覆盖
 const hostUinOverride = inject('hostUinOverride', null)
-const effectiveHostUin = computed(() => hostUinOverride?.value || userStore.userInfo.uin)
+const effectiveHostUin = computed(() => resolveQzoneHostUin(hostUinOverride?.value, userStore))
 // 好友上下文时跳过鉴权检查（避免好友相册权限码被误判为登录过期）
 const isFriendContext = computed(() => !!hostUinOverride?.value)
 const friendMeta = computed(() => (isFriendContext.value ? { skipAuthCheck: true } : {}))
@@ -321,43 +342,136 @@ const cancelFlags = ref(new Map()) // 存储每个相册的取消标志
 // 简易 MD5 实现（相册问题/密码验证使用）
 const simpleMD5 = (string) => {
   function md5cycle(x, k) {
-    let a = x[0], b = x[1], c = x[2], d = x[3]
-    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586); c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330)
-    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426); c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983)
-    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417); c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162)
-    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101); c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329)
-    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632); c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302)
-    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083); c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848)
-    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690); c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501)
-    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784); c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734)
-    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463); c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556)
-    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353); c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640)
-    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222); c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189)
-    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835); c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651)
-    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415); c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055)
-    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606); c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799)
-    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744); c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649)
-    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379); c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551)
-    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3])
+    let a = x[0],
+      b = x[1],
+      c = x[2],
+      d = x[3]
+    a = ff(a, b, c, d, k[0], 7, -680876936)
+    d = ff(d, a, b, c, k[1], 12, -389564586)
+    c = ff(c, d, a, b, k[2], 17, 606105819)
+    b = ff(b, c, d, a, k[3], 22, -1044525330)
+    a = ff(a, b, c, d, k[4], 7, -176418897)
+    d = ff(d, a, b, c, k[5], 12, 1200080426)
+    c = ff(c, d, a, b, k[6], 17, -1473231341)
+    b = ff(b, c, d, a, k[7], 22, -45705983)
+    a = ff(a, b, c, d, k[8], 7, 1770035416)
+    d = ff(d, a, b, c, k[9], 12, -1958414417)
+    c = ff(c, d, a, b, k[10], 17, -42063)
+    b = ff(b, c, d, a, k[11], 22, -1990404162)
+    a = ff(a, b, c, d, k[12], 7, 1804603682)
+    d = ff(d, a, b, c, k[13], 12, -40341101)
+    c = ff(c, d, a, b, k[14], 17, -1502002290)
+    b = ff(b, c, d, a, k[15], 22, 1236535329)
+    a = gg(a, b, c, d, k[1], 5, -165796510)
+    d = gg(d, a, b, c, k[6], 9, -1069501632)
+    c = gg(c, d, a, b, k[11], 14, 643717713)
+    b = gg(b, c, d, a, k[0], 20, -373897302)
+    a = gg(a, b, c, d, k[5], 5, -701558691)
+    d = gg(d, a, b, c, k[10], 9, 38016083)
+    c = gg(c, d, a, b, k[15], 14, -660478335)
+    b = gg(b, c, d, a, k[4], 20, -405537848)
+    a = gg(a, b, c, d, k[9], 5, 568446438)
+    d = gg(d, a, b, c, k[14], 9, -1019803690)
+    c = gg(c, d, a, b, k[3], 14, -187363961)
+    b = gg(b, c, d, a, k[8], 20, 1163531501)
+    a = gg(a, b, c, d, k[13], 5, -1444681467)
+    d = gg(d, a, b, c, k[2], 9, -51403784)
+    c = gg(c, d, a, b, k[7], 14, 1735328473)
+    b = gg(b, c, d, a, k[12], 20, -1926607734)
+    a = hh(a, b, c, d, k[5], 4, -378558)
+    d = hh(d, a, b, c, k[8], 11, -2022574463)
+    c = hh(c, d, a, b, k[11], 16, 1839030562)
+    b = hh(b, c, d, a, k[14], 23, -35309556)
+    a = hh(a, b, c, d, k[1], 4, -1530992060)
+    d = hh(d, a, b, c, k[4], 11, 1272893353)
+    c = hh(c, d, a, b, k[7], 16, -155497632)
+    b = hh(b, c, d, a, k[10], 23, -1094730640)
+    a = hh(a, b, c, d, k[13], 4, 681279174)
+    d = hh(d, a, b, c, k[0], 11, -358537222)
+    c = hh(c, d, a, b, k[3], 16, -722521979)
+    b = hh(b, c, d, a, k[6], 23, 76029189)
+    a = hh(a, b, c, d, k[9], 4, -640364487)
+    d = hh(d, a, b, c, k[12], 11, -421815835)
+    c = hh(c, d, a, b, k[15], 16, 530742520)
+    b = hh(b, c, d, a, k[2], 23, -995338651)
+    a = ii(a, b, c, d, k[0], 6, -198630844)
+    d = ii(d, a, b, c, k[7], 10, 1126891415)
+    c = ii(c, d, a, b, k[14], 15, -1416354905)
+    b = ii(b, c, d, a, k[5], 21, -57434055)
+    a = ii(a, b, c, d, k[12], 6, 1700485571)
+    d = ii(d, a, b, c, k[3], 10, -1894986606)
+    c = ii(c, d, a, b, k[10], 15, -1051523)
+    b = ii(b, c, d, a, k[1], 21, -2054922799)
+    a = ii(a, b, c, d, k[8], 6, 1873313359)
+    d = ii(d, a, b, c, k[15], 10, -30611744)
+    c = ii(c, d, a, b, k[6], 15, -1560198380)
+    b = ii(b, c, d, a, k[13], 21, 1309151649)
+    a = ii(a, b, c, d, k[4], 6, -145523070)
+    d = ii(d, a, b, c, k[11], 10, -1120210379)
+    c = ii(c, d, a, b, k[2], 15, 718787259)
+    b = ii(b, c, d, a, k[9], 21, -343485551)
+    x[0] = add32(a, x[0])
+    x[1] = add32(b, x[1])
+    x[2] = add32(c, x[2])
+    x[3] = add32(d, x[3])
   }
-  function cmn(q, a, b, x, s, t) { a = add32(add32(a, q), add32(x, t)); return add32((a << s) | (a >>> (32 - s)), b) }
-  function ff(a, b, c, d, x, s, t) { return cmn((b & c) | ((~b) & d), a, b, x, s, t) }
-  function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & (~d)), a, b, x, s, t) }
-  function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t) }
-  function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | (~d)), a, b, x, s, t) }
+  function cmn(q, a, b, x, s, t) {
+    a = add32(add32(a, q), add32(x, t))
+    return add32((a << s) | (a >>> (32 - s)), b)
+  }
+  function ff(a, b, c, d, x, s, t) {
+    return cmn((b & c) | (~b & d), a, b, x, s, t)
+  }
+  function gg(a, b, c, d, x, s, t) {
+    return cmn((b & d) | (c & ~d), a, b, x, s, t)
+  }
+  function hh(a, b, c, d, x, s, t) {
+    return cmn(b ^ c ^ d, a, b, x, s, t)
+  }
+  function ii(a, b, c, d, x, s, t) {
+    return cmn(c ^ (b | ~d), a, b, x, s, t)
+  }
   function md5blk(s) {
-    const md5blks = []; for (let i = 0; i < 64; i += 4) md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24)
+    const md5blks = []
+    for (let i = 0; i < 64; i += 4)
+      md5blks[i >> 2] =
+        s.charCodeAt(i) +
+        (s.charCodeAt(i + 1) << 8) +
+        (s.charCodeAt(i + 2) << 16) +
+        (s.charCodeAt(i + 3) << 24)
     return md5blks
   }
-  function add32(a, b) { return (a + b) & 0xFFFFFFFF }
-  function rhex(n) { let s = ''; for (let j = 0; j < 4; j++) s += ('0' + ((n >> (j * 8 + 4)) & 0x0F).toString(16)).slice(-1) + ('0' + ((n >> (j * 8)) & 0x0F).toString(16)).slice(-1); return s }
-  function hex(x) { for (let i = 0; i < x.length; i++) x[i] = rhex(x[i]); return x.join('') }
+  function add32(a, b) {
+    return (a + b) & 0xffffffff
+  }
+  function rhex(n) {
+    let s = ''
+    for (let j = 0; j < 4; j++)
+      s +=
+        ('0' + ((n >> (j * 8 + 4)) & 0x0f).toString(16)).slice(-1) +
+        ('0' + ((n >> (j * 8)) & 0x0f).toString(16)).slice(-1)
+    return s
+  }
+  function hex(x) {
+    for (let i = 0; i < x.length; i++) x[i] = rhex(x[i])
+    return x.join('')
+  }
   function md5str(s) {
-    let n = s.length; const state = [1732584193, -271733879, -1732584194, 271733878]; let i
+    let n = s.length
+    const state = [1732584193, -271733879, -1732584194, 271733878]
+    let i
     for (i = 64; i <= n; i += 64) md5cycle(state, md5blk(s.substring(i - 64, i)))
-    s = s.substring(i - 64); const tail = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]; for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3)
-    tail[i >> 2] |= 0x80 << ((i % 4) << 3); if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0 }
-    tail[14] = n * 8; md5cycle(state, tail); return hex(state)
+    s = s.substring(i - 64)
+    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3)
+    tail[i >> 2] |= 0x80 << ((i % 4) << 3)
+    if (i > 55) {
+      md5cycle(state, tail)
+      for (i = 0; i < 16; i++) tail[i] = 0
+    }
+    tail[14] = n * 8
+    md5cycle(state, tail)
+    return hex(state)
   }
   return md5str(string)
 }
@@ -448,7 +562,7 @@ const fetchPhotosByTopicId = async (topicId, pageStart = 0, pageNum = 100) => {
       nextPageStart: pageStart,
       skippedCount: 0,
       requestedCount: pageNum,
-      error: response?.message || `API 错误: code=${response?.code}, message=${response?.message}`,
+      error: response?.message || '暂时无法读取照片，请稍后重试。',
       code: response?.code
     }
   } catch (error) {
@@ -496,7 +610,7 @@ const addDownloadTask = async (albumData) => {
     // 确保传递用户信息，好友模式下附带 friendUin
     const enrichedAlbumData = {
       ...albumData,
-      uin: userStore.userInfo?.uin || 'unknown',
+      uin: resolveSelfQzoneUin(userStore) || 'unknown',
       p_skey: userStore.PSkey || null,
       ...(isFriendContext.value ? { friendUin: hostUinOverride.value } : {})
     }
@@ -884,7 +998,7 @@ const fetchAndAddPhotosStream = async (album, albumId, onProgress = null) => {
             desc: album.desc || ''
           },
           photos: cleanPhotos,
-          uin: userStore.userInfo?.uin || 'unknown',
+          uin: resolveSelfQzoneUin(userStore) || 'unknown',
           albumId: albumId
         }
 
@@ -1075,13 +1189,16 @@ const deleteSelected = async () => {
     })
 
     // 调用删除API
-    const result = await window.QzoneAPI.deletePhotos({
-      hostUin: effectiveHostUin.value,
-      albumId: currentAlbum.value.id,
-      photoData: photoData,
-      albumName: currentAlbum.value.name,
-      priv: currentAlbum.value.priv || 3
-    }, friendMeta.value)
+    const result = await window.QzoneAPI.deletePhotos(
+      {
+        hostUin: effectiveHostUin.value,
+        albumId: currentAlbum.value.id,
+        photoData: photoData,
+        albumName: currentAlbum.value.name,
+        priv: currentAlbum.value.priv || 3
+      },
+      friendMeta.value
+    )
 
     loadingInstance.close()
 
@@ -1133,7 +1250,7 @@ const downloadSelected = async () => {
         desc: currentAlbum.value.desc || ''
       },
       photos: cleanPhotos,
-      uin: userStore.userInfo?.uin || 'unknown'
+      uin: resolveSelfQzoneUin(userStore) || 'unknown'
     }
 
     const result = await addDownloadTask(albumData)

@@ -159,7 +159,7 @@
                 <span
                   class="uin uin-copyable"
                   title="点击复制 QQ 号"
-                  @click="copyToClipboard(userStore.userInfo?.uin, 'QQ 号')"
+                  @click="copyToClipboard(profileUin, 'QQ 号')"
                 >
                   {{ displayUin }}
                 </span>
@@ -299,7 +299,7 @@
     </div>
 
     <!-- 下载全部相册功能区 -->
-    <div v-if="currentModule === 'album'" class="download-all-section">
+    <div v-if="currentModule === 'album' && !albumLoadError" class="download-all-section">
       <div class="download-all-card">
         <div class="download-all-button" @click="toggleDownloadAll">
           <div class="button-content">
@@ -338,7 +338,7 @@
       <el-scrollbar class="h-full">
         <!-- 相册模块 -->
         <el-menu
-          v-if="currentModule === 'album'"
+          v-if="currentModule === 'album' && !loading && !albumLoadError"
           :default-openeds="Array.from(openedKeys)"
           :default-active="selectedAlbumKey"
           mode="vertical"
@@ -463,6 +463,34 @@
             </el-menu-item>
           </el-sub-menu>
         </el-menu>
+
+        <section
+          v-else-if="currentModule === 'album'"
+          class="album-load-state"
+          :class="{ 'is-error': albumLoadError }"
+          :role="albumLoadError ? 'alert' : 'status'"
+          aria-live="polite"
+        >
+          <el-icon v-if="loading" class="album-load-icon is-loading"><Loading /></el-icon>
+          <el-icon v-else class="album-load-icon"><WarningFilled /></el-icon>
+          <template v-if="loading">
+            <h3>正在读取相册</h3>
+            <p>请稍候，正在从 QQ 空间获取相册列表。</p>
+          </template>
+          <template v-else>
+            <h3>暂时无法获取相册</h3>
+            <p>{{ albumLoadError.message }}</p>
+            <el-button
+              type="primary"
+              plain
+              :icon="RefreshRight"
+              class="album-retry-button"
+              @click="retryPhotoData"
+            >
+              重新加载
+            </el-button>
+          </template>
+        </section>
 
         <!-- 照片模块：来源 + 类型 + 年份 -->
         <div v-else-if="currentModule === 'photo'" class="photo-side">
@@ -870,9 +898,11 @@ import {
   Monitor,
   Folder,
   Picture,
+  RefreshRight,
   User,
   UserFilled,
   VideoPlay,
+  WarningFilled,
   Lock,
   Hide,
   Key,
@@ -888,6 +918,7 @@ import UploadManager from '@renderer/components/UploadManager/index.vue'
 import { generateUniqueAlbumName, copyToClipboard } from '@renderer/utils'
 import { QZONE_CONFIG } from '@shared/const'
 import { formatBytes } from '@renderer/utils/formatters'
+import { resolveQzoneHostUin, resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 
 const handleMenuSelect = (index) => {
   // 菜单选择处理由 selectAlbumItem 函数处理
@@ -931,11 +962,11 @@ const renderFriendName = (name) => {
   )
 }
 
-// 好友模式下使用好友 uin，否则使用自己 uin
 const effectiveHostUin = computed(() =>
-  props.viewMode === 'friend' && props.currentFriend
-    ? props.currentFriend.uin
-    : userStore.userInfo.uin
+  resolveQzoneHostUin(
+    props.viewMode === 'friend' && props.currentFriend ? props.currentFriend.uin : null,
+    userStore
+  )
 )
 const isFriendMode = computed(() => props.viewMode === 'friend')
 const friendMeta = computed(() => (isFriendMode.value ? { skipAuthCheck: true } : {}))
@@ -1054,14 +1085,43 @@ const props = defineProps({
 const emit = defineEmits(['album-selected', 'module-changed', 'enter-friend', 'exit-friend'])
 
 const userStore = useUserStore()
+const selfQzoneUin = computed(() => resolveSelfQzoneUin(userStore))
+// 资料卡展示（头像、昵称、可复制 QQ 号）以资料接口为准；它与请求相册时使用的
+// 登录 Cookie 账号不是同一职责，不能共用 API hostUin。
+const profileUin = computed(() => String(userStore.userInfo?.uin || selfQzoneUin.value || ''))
 const userAvatarUrl = computed(() =>
   window.QzoneAPI?.demoMode
     ? 'http://127.0.0.1:4173/assets/demo/logo.png'
-    : `https://qlogo4.store.qq.com/qzone/${userStore.userInfo?.uin}/${userStore.userInfo?.uin}/100`
+    : `https://qlogo4.store.qq.com/qzone/${profileUin.value}/${profileUin.value}/100`
 )
 const downloadStore = useDownloadStore()
 const refreshAlbumCallback = inject('refreshAlbumCallback', null)
 const loading = ref(false)
+const albumLoadError = ref(null)
+let albumLoadRequestId = 0
+
+const describeAlbumLoadError = (error) => {
+  const code = String(error?.code || '')
+  const message = String(error?.message || '')
+
+  if (code === '401' || /登录态|未登录|请先登录/i.test(message)) {
+    return '登录状态已失效，请重新登录后再试。'
+  }
+  if (code === '403' || /无权限|没有权限|访问受限/i.test(message)) {
+    return isFriendMode.value ? '对方空间暂不允许查看相册。' : '当前账号没有权限读取这些相册。'
+  }
+  if (code === '500' || /status code 5\d\d|服务器错误|服务异常/i.test(message)) {
+    return 'QQ 空间暂时没有返回相册数据，请稍后重新加载。'
+  }
+  if (/timeout|timed out|网络|network|ECONN/i.test(message)) {
+    return '网络连接不稳定，请检查网络后重新加载。'
+  }
+  return '暂时无法获取相册，请稍后重新加载。'
+}
+
+const retryPhotoData = () => {
+  if (!loading.value) fetchPhotoData()
+}
 
 // 相册问答缓存
 const albumQAMap = reactive({})
@@ -1222,7 +1282,7 @@ const maskUin = (uin) => {
 
 // 计算显示的QQ号
 const displayUin = computed(() => {
-  const uin = userStore.userInfo?.uin
+  const uin = profileUin.value
   if (!uin) return ''
   return showUin.value ? uin : maskUin(uin)
 })
@@ -1527,7 +1587,7 @@ const startDownloadAll = async () => {
                   desc: album.desc
                 },
                 photos: photoList,
-                uin: userStore.userInfo?.uin || 'unknown',
+                uin: resolveSelfQzoneUin(userStore) || 'unknown',
                 albumId: album.id,
                 ...(isFriendMode.value ? { friendUin: effectiveHostUin.value } : {})
               }
@@ -1773,7 +1833,9 @@ const findAlbumById = async (albumId) => {
 }
 
 const fetchPhotoData = async () => {
+  const requestId = ++albumLoadRequestId
   loading.value = true
+  albumLoadError.value = null
   let allAlbumsData = []
 
   try {
@@ -1786,12 +1848,19 @@ const fetchPhotoData = async () => {
       },
       friendMeta.value
     )
-    console.log('[Left] 初始相册列表数据:', JSON.parse(JSON.stringify(initialRes)))
-
     if (!initialRes || !initialRes.data) {
-      console.error('[Left] 获取相册数据失败')
+      if (requestId === albumLoadRequestId) {
+        albumLoadError.value = {
+          message: 'QQ 空间没有返回相册数据，请稍后重新加载。'
+        }
+      }
+      console.error('[Left] 获取相册数据失败：未返回有效数据')
       return
     }
+
+    console.debug('[Left] 相册初始数据已获取', {
+      albumsInUser: initialRes.data.albumsInUser || 0
+    })
 
     // 初始化数据
     apiData.value = initialRes.data
@@ -2000,8 +2069,13 @@ const fetchPhotoData = async () => {
     })
   } catch (error) {
     console.error('[Left] 加载相册数据失败:', error)
+    if (requestId === albumLoadRequestId) {
+      albumLoadError.value = { message: describeAlbumLoadError(error) }
+    }
   } finally {
-    loading.value = false
+    if (requestId === albumLoadRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -3211,6 +3285,78 @@ defineExpose({
 .menu-container {
   :deep(.el-scrollbar__wrap) {
     padding-right: 6px;
+  }
+}
+
+.album-load-state {
+  display: flex;
+  min-height: 196px;
+  padding: 28px 22px 24px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+
+  .album-load-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 12px;
+    padding: 8px;
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #93c5fd;
+    font-size: 16px;
+  }
+
+  h3 {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  p {
+    max-width: 194px;
+    margin: 7px 0 0;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  &.is-error {
+    .album-load-icon {
+      border-color: rgba(251, 146, 60, 0.2);
+      background: rgba(251, 146, 60, 0.1);
+      color: #fbbf24;
+    }
+  }
+
+  .album-retry-button {
+    min-height: 32px;
+    margin-top: 16px;
+    border-color: rgba(96, 165, 250, 0.42);
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #bfdbfe;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      border-color: rgba(96, 165, 250, 0.75);
+      background: rgba(59, 130, 246, 0.2);
+      color: #ffffff;
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.7);
+      outline-offset: 2px;
+    }
   }
 }
 

@@ -604,6 +604,7 @@ import { copyToClipboard } from '@renderer/utils'
 import { getQQAvatarUrl } from '@renderer/utils/formatters'
 import { createPaginationGuard } from '@renderer/utils/paginationGuard'
 import { cacheFeedDescriptions } from '@renderer/utils/feed-description-cache'
+import { resolveQzoneHostUin, resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 import Hls from 'hls.js'
 
 const privacyStore = usePrivacyStore()
@@ -627,7 +628,7 @@ const userStore = useUserStore()
 // 支持好友上下文
 const hostUinOverride = inject('hostUinOverride', null)
 const leftRef = inject('leftRef', null)
-const effectiveHostUin = computed(() => hostUinOverride?.value || userStore.userInfo.uin)
+const effectiveHostUin = computed(() => resolveQzoneHostUin(hostUinOverride?.value, userStore))
 const isFriendContext = computed(() => !!hostUinOverride?.value)
 const friendMeta = computed(() => (isFriendContext.value ? { skipAuthCheck: true } : {}))
 
@@ -1065,7 +1066,7 @@ const toggleFeedSelection = (feed) => {
 
 const addFeedDownloadTasks = async (feedList) => {
   const groups = new Map()
-  const accountUin = userStore.userInfo?.uin || effectiveHostUin.value
+  const accountUin = resolveSelfQzoneUin(userStore) || effectiveHostUin.value
 
   feedList.forEach((feed) => {
     const friendUin = isFriendPhotos.value

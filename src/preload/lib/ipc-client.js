@@ -38,7 +38,9 @@ const logger = {
 }
 
 export const ipcClient = {
-  call: async (channel, payload = {}, meta = {}) => {
+  // `throwOnResponseError` 只在调用方明确需要时启用，避免改变既有接口
+  // 对“返回空数据即可”的兼容语义。相册首屏属于必须可恢复的场景，应该拿到真实错误。
+  call: async (channel, payload = {}, meta = {}, { throwOnResponseError = false } = {}) => {
     try {
       // 自动携带认证令牌
       const context = {
@@ -54,13 +56,17 @@ export const ipcClient = {
 
       const res = await ipcRenderer.invoke(channel, context)
 
-      logger.debug(`[IPC] ${channel} 调用成功`, '\n请求参数:', context, '\n返回数据:', res)
-
-      const { data, error } = res
+      const { data, error, code, message, detail } = res || {}
 
       if (error) {
         throw new IpcError(error.message || '请求处理失败', error.code || 'IPC_ERROR', error.detail)
       }
+
+      if (throwOnResponseError && Number(code) !== 0) {
+        throw new IpcError(message || '请求处理失败', code || 'IPC_ERROR', detail)
+      }
+
+      logger.debug(`[IPC] ${channel} 调用成功`, '\n请求参数:', context, '\n返回数据:', res)
 
       // 检查认证状态（支持通过 meta.skipAuthCheck 跳过）
       const authCheckResult = performAuthCheck(data, meta)

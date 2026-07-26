@@ -58,12 +58,7 @@
             >
               <!-- 封面：占整张卡片 -->
               <div class="video-cover">
-                <el-image
-                  :src="video.pre"
-                  fit="cover"
-                  class="cover-image"
-                  loading="lazy"
-                >
+                <el-image :src="video.pre" fit="cover" class="cover-image" loading="lazy">
                   <template #error>
                     <div class="image-error">
                       <el-icon><VideoPlay /></el-icon>
@@ -183,6 +178,7 @@ import LoadingState from '@renderer/components/LoadingState/index.vue'
 import { useUserStore } from '@renderer/store/user.store'
 import { usePrivacyStore } from '@renderer/store/privacy.store'
 import { createPaginationGuard } from '@renderer/utils/paginationGuard'
+import { resolveQzoneHostUin, resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 import Hls from 'hls.js'
 
 const userStore = useUserStore()
@@ -190,7 +186,7 @@ const privacyStore = usePrivacyStore()
 
 // 支持好友上下文
 const hostUinOverride = inject('hostUinOverride', null)
-const effectiveHostUin = computed(() => hostUinOverride?.value || userStore.userInfo.uin)
+const effectiveHostUin = computed(() => resolveQzoneHostUin(hostUinOverride?.value, userStore))
 const isFriendContext = computed(() => !!hostUinOverride?.value)
 const friendMeta = computed(() => (isFriendContext.value ? { skipAuthCheck: true } : {}))
 
@@ -287,9 +283,7 @@ const fetchVideoList = async (isLoadMore = false) => {
 }
 
 // 累计已加载视频的总时长 / 年份集合
-const totalDuration = computed(() =>
-  videos.value.reduce((sum, v) => sum + (v.duration || 0), 0)
-)
+const totalDuration = computed(() => videos.value.reduce((sum, v) => sum + (v.duration || 0), 0))
 const years = computed(() => {
   const set = new Set()
   videos.value.forEach((v) => {
@@ -355,7 +349,8 @@ const resetVideoList = () => {
   })
 }
 
-const getVideoDownloadUrl = (video) => video?.url || video?.raw || video?.videoUrl || video?.downloadUrl || ''
+const getVideoDownloadUrl = (video) =>
+  video?.url || video?.raw || video?.videoUrl || video?.downloadUrl || ''
 
 const rawUin = (uin) => String(uin || '').replace(/^o/, '')
 
@@ -370,7 +365,7 @@ const downloadAllVideos = async () => {
   downloadingAll.value = true
   try {
     const hostUin = effectiveHostUin.value
-    const accountUin = userStore.userInfo?.uin || hostUin
+    const accountUin = resolveSelfQzoneUin(userStore) || hostUin
     const now = Math.floor(Date.now() / 1000)
     const ids = await window.QzoneAPI.download.addFeeds({
       feeds: [
@@ -644,7 +639,8 @@ const openVideoInBrowser = () => {
     return
   }
 
-  window.QzoneAPI?.shell?.openExternal?.(currentVideo.value.url)
+  window.QzoneAPI?.shell
+    ?.openExternal?.(currentVideo.value.url)
     ?.then(() => ElMessage.success('正在打开视频...'))
     ?.catch(() => ElMessage.error('打开视频失败'))
 }

@@ -40,7 +40,7 @@ const classifyPhotoPayload = (payload) => {
       return {
         kind: 'api-error',
         code: payload.code,
-        message: payload.message || `API 错误: code=${payload.code}, message=${payload.message}`
+        message: payload.message || 'QQ 空间暂时没有返回完整的照片数据，请稍后重试。'
       }
     }
     return { kind: 'unknown' }

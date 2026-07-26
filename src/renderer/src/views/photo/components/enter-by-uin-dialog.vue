@@ -239,6 +239,7 @@ import { Gem, Mars, Venus } from '@lucide/vue'
 import { useUserStore } from '@renderer/store/user.store'
 import { copyToClipboard } from '@renderer/utils'
 import { formatBytes } from '@renderer/utils/formatters'
+import { resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 
 const props = defineProps({
   visible: { type: Boolean, default: false }
@@ -378,7 +379,7 @@ const handleQuery = async () => {
     errorMsg.value = '请输入合法的 QQ 号 (5-11 位数字)'
     return
   }
-  if (String(uin) === String(userStore.userInfo?.uin)) {
+  if (String(uin) === resolveSelfQzoneUin(userStore)) {
     errorMsg.value = '不能进入自己的空间'
     return
   }
@@ -589,13 +590,17 @@ const reset = () => {
   border-radius: 10px !important;
   padding: 0 22px !important;
   font-weight: 600 !important;
-  box-shadow: var(--ds-shadow-md), 0 4px 12px rgba(96, 165, 250, 0.25);
+  box-shadow:
+    var(--ds-shadow-md),
+    0 4px 12px rgba(96, 165, 250, 0.25);
   transition: all 0.2s ease;
 }
 
 .query-btn:hover:not(:disabled) {
   filter: brightness(1.08);
-  box-shadow: var(--ds-shadow-md), 0 6px 16px rgba(96, 165, 250, 0.35);
+  box-shadow:
+    var(--ds-shadow-md),
+    0 6px 16px rgba(96, 165, 250, 0.35);
 }
 
 .query-btn:disabled {
@@ -956,12 +961,16 @@ const reset = () => {
   background: var(--ds-accent-blue, #60a5fa) !important;
   border: none !important;
   font-weight: 600 !important;
-  box-shadow: var(--ds-shadow-md), 0 4px 12px rgba(96, 165, 250, 0.25);
+  box-shadow:
+    var(--ds-shadow-md),
+    0 4px 12px rgba(96, 165, 250, 0.25);
 }
 
 .enter-btn:hover:not(:disabled) {
   filter: brightness(1.08);
-  box-shadow: var(--ds-shadow-md), 0 6px 16px rgba(96, 165, 250, 0.35);
+  box-shadow:
+    var(--ds-shadow-md),
+    0 6px 16px rgba(96, 165, 250, 0.35);
 }
 
 .enter-btn:disabled {

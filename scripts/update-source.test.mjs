@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  UPDATE_REQUEST_TIMEOUT_MS,
   getUpdateCheckRoute,
   matchesPinnedUpdateCandidate,
   selectCompatibleUpdateFile,
@@ -35,6 +36,21 @@ test('routes every R2 result deterministically before considering GitHub', () =>
     getUpdateCheckRoute({ isUpdateAvailable: true, updateInfo }, null),
     UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
   )
+  assert.equal(
+    getUpdateCheckRoute({ isUpdateAvailable: true, updateInfo: { version: '2.7.1' } }, null),
+    UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
+  )
+  assert.equal(
+    getUpdateCheckRoute(
+      { isUpdateAvailable: false, updateInfo: { version: '2.7.1-beta.1' } },
+      null
+    ),
+    UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
+  )
+})
+
+test('uses a short, explicit request timeout instead of electron-updater default', () => {
+  assert.equal(UPDATE_REQUEST_TIMEOUT_MS, 8_000)
 })
 
 test('only accepts the exact versioned R2 asset for the current platform', () => {

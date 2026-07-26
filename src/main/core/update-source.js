@@ -7,6 +7,10 @@ export const OFFICIAL_UPDATE_SOURCES = Object.freeze({
   })
 })
 
+// electron-updater 的 HTTP 默认超时是 120 秒。常规检查优先保证界面可恢复，
+// R2 或 GitHub 任一通道失联时尽快切换或向用户返回可重试状态。
+export const UPDATE_REQUEST_TIMEOUT_MS = 8_000
+
 export function isStableReleaseVersion(value) {
   return /^\d+\.\d+\.\d+$/.test(String(value || '').trim())
 }

@@ -122,14 +122,8 @@
                 >
                   <span class="checking-spinner"></span>
                 </span>
+                <span v-if="showUpdateBadge" class="update-dot" aria-hidden="true"></span>
               </span>
-            </transition>
-            <transition name="fade">
-              <span
-                v-if="showUpdateBadge"
-                class="update-dot"
-                title="发现新版本，点击查看详情"
-              ></span>
             </transition>
           </template>
         </button>
@@ -397,9 +391,7 @@ const privacyStore = usePrivacyStore()
 const userStore = useUserStore()
 
 // 判断用户是否已登录
-const isLoggedIn = computed(() => {
-  return !!userStore.userInfo?.uin
-})
+const isLoggedIn = computed(() => userStore.isLoggedIn)
 
 // 更新状态
 const updateState = reactive({
@@ -590,6 +582,78 @@ const beginUpdateCheckRequest = (background) => {
 const finishUpdateCheckRequest = () => {
   isUpdateCheckRequestPending.value = false
   clearUpdateCheckUiTimer()
+}
+
+const resetUpdatePreviewState = () => {
+  clearUpdateCheckUiTimer()
+  clearVersionCheckFeedback()
+  Object.assign(updateState, {
+    checking: false,
+    downloading: false,
+    downloaded: false,
+    progress: 0,
+    bytesPerSecond: 0,
+    transferred: 0,
+    total: 0,
+    remainingTime: '',
+    usingFallbackDownload: false,
+    canCancel: true,
+    hasUpdate: false
+  })
+  updateInfo.value = {}
+  errorInfo.value = {}
+  dialogState.value = 'idle'
+  dialogVisible.value = false
+  silentChecking.value = false
+  isUpdateCheckRequestPending.value = false
+}
+
+// 仅用于本地开发时做状态回归截图，不会进入生产构建。
+const applyDevUpdatePreview = (state = 'idle') => {
+  resetUpdatePreviewState()
+  const previewInfo = {
+    version: '2.7.1',
+    releaseDate: '2026-07-26T12:00:00.000Z',
+    releaseNotes: '优化更新检查与下载体验',
+    files: [{ size: 126_038_016 }],
+    updateSize: 126_038_016
+  }
+
+  if (state === 'checking') {
+    updateState.checking = true
+  } else if (state === 'available') {
+    updateState.hasUpdate = true
+    updateInfo.value = previewInfo
+  } else if (state === 'downloading') {
+    updateState.downloading = true
+    updateState.progress = 73.4
+    updateState.transferred = 92_516_352
+    updateState.total = previewInfo.updateSize
+    updateState.bytesPerSecond = 2_725_000
+    updateState.remainingTime = '约 12 秒'
+    updateInfo.value = previewInfo
+    dialogState.value = 'downloading'
+    dialogVisible.value = true
+  } else if (state === 'downloaded') {
+    updateState.downloaded = true
+    updateState.progress = 100
+    updateInfo.value = previewInfo
+    dialogState.value = 'downloaded'
+    dialogVisible.value = true
+  } else if (state === 'error') {
+    updateInfo.value = previewInfo
+    errorInfo.value = {
+      message: '更新服务暂时不可用',
+      detail: '请稍后重试，或前往官网下载。',
+      canRetry: true
+    }
+    dialogState.value = 'error'
+    dialogVisible.value = true
+  } else if (state === 'latest') {
+    showVersionCheckFeedback('latest')
+  }
+
+  return state
 }
 
 // 窗口控制方法
@@ -1112,6 +1176,12 @@ onMounted(async () => {
     window.QzoneAPI.update.onUpdateError(handleUpdateError)
   }
 
+  if (import.meta.env.DEV) {
+    window.__QZONEPHOTO_UPDATE_PREVIEW__ = applyDevUpdatePreview
+    const previewState = String(import.meta.env.VITE_QZONEPHOTO_UPDATE_PREVIEW || '').trim()
+    if (previewState) applyDevUpdatePreview(previewState)
+  }
+
   handleVersionClick(true)
 })
 
@@ -1127,6 +1197,9 @@ onUnmounted(() => {
   // 移除更新相关监听器
   if (window.QzoneAPI?.update) {
     window.QzoneAPI.update.removeAllListeners()
+  }
+  if (import.meta.env.DEV && window.__QZONEPHOTO_UPDATE_PREVIEW__ === applyDevUpdatePreview) {
+    delete window.__QZONEPHOTO_UPDATE_PREVIEW__
   }
 })
 
@@ -2072,19 +2145,16 @@ watch([dialogVisible, noticeVisible], () => {
 }
 
 .update-dot {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  z-index: 1;
+  display: inline-flex;
+  flex: 0 0 6px;
   width: 6px;
   height: 6px;
+  margin-left: 1px;
   background: linear-gradient(135deg, var(--ds-state-success) 0%, #85ce61 100%);
   border-radius: 50%;
-  margin-left: 0;
-  transform: translateY(-50%);
   box-shadow:
-    0 0 0 2px rgba(52, 211, 153, 0.3),
-    0 0 6px rgba(52, 211, 153, 0.6);
+    0 0 0 2px rgba(52, 211, 153, 0.16),
+    0 0 6px rgba(52, 211, 153, 0.34);
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -2115,11 +2185,11 @@ watch([dialogVisible, noticeVisible], () => {
 @keyframes pulse-dot {
   0%,
   100% {
-    transform: translateY(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
   50% {
-    transform: translateY(-50%) scale(1.2);
+    transform: scale(1.14);
     opacity: 0.8;
   }
 }

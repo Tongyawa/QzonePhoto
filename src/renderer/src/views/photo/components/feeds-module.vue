@@ -415,15 +415,19 @@ import RichText from '@renderer/components/RichText/index.vue'
 import { useUserStore } from '@renderer/store/user.store'
 import { usePrivacyStore } from '@renderer/store/privacy.store'
 import { createPaginationGuard } from '@renderer/utils/paginationGuard'
+import {
+  normalizeQzoneUin,
+  resolveQzoneHostUin,
+  resolveSelfQzoneUin
+} from '@renderer/utils/qzone-identity'
 
 const userStore = useUserStore()
 const privacyStore = usePrivacyStore()
 const leftRef = inject('leftRef', ref(null))
 const hostUinOverride = inject('hostUinOverride', null)
-const normalizeQzoneUin = (uin) => String(uin || '').replace(/^o/, '')
 const isFriendContext = computed(() => !!hostUinOverride?.value)
-const selfUin = computed(() => normalizeQzoneUin(userStore.userInfo?.uin || userStore.Uin))
-const activeHostUin = computed(() => normalizeQzoneUin(hostUinOverride?.value || selfUin.value))
+const selfUin = computed(() => resolveSelfQzoneUin(userStore))
+const activeHostUin = computed(() => resolveQzoneHostUin(hostUinOverride?.value, userStore))
 
 const PAGE_SIZE = 10
 const LAST_YEAR_MIN = 2010

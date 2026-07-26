@@ -50,7 +50,9 @@ try {
     // 获取个人信息
     fetchUserInfo: () => ipcClient.call(IPC_USER.ME_INFO),
     // 获取相册列表
-    getPhotoList: (data, meta) => ipcClient.call(IPC_PHOTO.PHOTO_LIST, data, meta),
+    // 相册首屏加载失败时必须让页面获得真实错误，提供明确的重试入口，不能吞成 null。
+    getPhotoList: (data, meta) =>
+      ipcClient.call(IPC_PHOTO.PHOTO_LIST, data, meta, { throwOnResponseError: true }),
     // 获取我的相册中的照片
     getPhotoByTopicId: (data, meta) => ipcClient.call(IPC_PHOTO.PHOTO_BY_TOPIC_ID, data, meta),
     // 获取照片浮层视图列表

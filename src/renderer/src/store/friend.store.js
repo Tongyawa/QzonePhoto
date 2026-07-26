@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useUserStore } from './user.store'
+import { resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 
 // 顶层 Tab：0=QQ 分组 1=我在意谁 2=谁在意我
 export const FRIEND_TAB = { QQ_GROUP: 0, CARE: 1, CARE_BY: 2 }
@@ -77,7 +78,7 @@ export const useFriendStore = defineStore('friend', () => {
     loading.value = true
     try {
       const res = await window.QzoneAPI.getQQFriends(
-        { hostUin: userStore.userInfo.uin },
+        { hostUin: resolveSelfQzoneUin(userStore) },
         { skipAuthCheck: true }
       )
       // follow_flag=1 时"特别关心"的好友会在 items 里出现两次，按 uin 去重
@@ -96,7 +97,7 @@ export const useFriendStore = defineStore('friend', () => {
     loading.value = true
     try {
       const res = await window.QzoneAPI.getFriendList(
-        { doType, hostUin: userStore.userInfo.uin },
+        { doType, hostUin: resolveSelfQzoneUin(userStore) },
         { skipAuthCheck: true }
       )
       const items = dedupByUin(res?.data?.items_list)

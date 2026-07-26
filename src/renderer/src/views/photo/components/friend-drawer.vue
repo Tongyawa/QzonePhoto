@@ -224,6 +224,7 @@ import { useFriendStore, FRIEND_TAB } from '@renderer/store/friend.store'
 import { useUserStore } from '@renderer/store/user.store'
 import { useDownloadStore } from '@renderer/store/download.store'
 import { copyToClipboard, generateUniqueAlbumName } from '@renderer/utils'
+import { resolveSelfQzoneUin } from '@renderer/utils/qzone-identity'
 import EnterByUinDialog from './enter-by-uin-dialog.vue'
 
 defineProps({
@@ -456,7 +457,7 @@ const downloadFriendAllAlbums = async (friend) => {
               desc: album.desc
             },
             photos: photoList,
-            uin: userStore.userInfo?.uin || 'unknown',
+            uin: resolveSelfQzoneUin(userStore) || 'unknown',
             albumId: album.id,
             friendUin: friend.uin
           })
@@ -1033,7 +1034,9 @@ defineExpose({ toggleDrawer })
   padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .drawer-friend-item:hover {

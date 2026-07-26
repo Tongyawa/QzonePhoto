@@ -7,6 +7,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import { APP_DOWNLOAD_PAGE } from '@shared/const'
 import {
+  UPDATE_REQUEST_TIMEOUT_MS,
   getUpdateCheckRoute,
   isStableReleaseVersion,
   matchesPinnedUpdateCandidate,
@@ -146,7 +147,9 @@ export class AutoUpdateManager extends EventEmitter {
     if (usePrimary) {
       autoUpdater.setFeedURL({
         provider: 'generic',
-        url: this.config.primaryFeedUrl
+        url: this.config.primaryFeedUrl,
+        // 默认是两分钟；更新检查属于非关键后台操作，不能让一个不可达的源长期占用检查状态。
+        timeout: UPDATE_REQUEST_TIMEOUT_MS
       })
       this.state.updateSource = 'r2'
       logger.info('[更新] 使用 R2/generic 更新源', this.config.primaryFeedUrl)
@@ -158,6 +161,7 @@ export class AutoUpdateManager extends EventEmitter {
       owner: this.config.github.owner,
       repo: this.config.github.repo,
       private: false,
+      timeout: UPDATE_REQUEST_TIMEOUT_MS,
       releaseType: this.config.allowPreRelease
         ? 'prerelease'
         : this.config.github.releaseType || 'release'

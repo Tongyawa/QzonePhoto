@@ -326,17 +326,12 @@ import {
   Unlock,
   ArrowDown
 } from '@element-plus/icons-vue'
-import {
-  Image as LucideImage,
-  MessageCircle,
-  CalendarDays,
-  Clock,
-  Eye
-} from '@lucide/vue'
+import { Image as LucideImage, MessageCircle, CalendarDays, Clock, Eye } from '@lucide/vue'
 import StatCard from '@renderer/components/StatCard/index.vue'
 import UploadDialog from '@renderer/components/UploadDialog/index.vue'
 import { formatDateWithYear } from '@renderer/utils/formatters'
 import { copyToClipboard } from '@renderer/utils'
+import { resolveQzoneHostUin } from '@renderer/utils/qzone-identity'
 import { useDownloadStore } from '@renderer/store/download.store'
 import { usePrivacyStore } from '@renderer/store/privacy.store'
 import { useUserStore } from '@renderer/store/user.store'
@@ -348,7 +343,7 @@ const userStore = useUserStore()
 
 const hostUinOverride = inject('hostUinOverride', null)
 const isFriendContext = computed(() => !!hostUinOverride?.value)
-const effectiveHostUin = computed(() => hostUinOverride?.value || userStore.userInfo?.uin)
+const effectiveHostUin = computed(() => resolveQzoneHostUin(hostUinOverride?.value, userStore))
 
 const currentAlbum = inject('currentAlbum', ref(null))
 const leftRef = inject('leftRef', ref(null))
@@ -435,12 +430,14 @@ const viewtypeText = computed(() => {
   return QZONE_CONFIG.viewtypeMap[v] || ''
 })
 
-// 访客信息（cgi_get_visitor_simple，按需拉取）
+// 访客信息仅用于本人相册。好友相册没有稳定的访客查看权限，
+// 不请求该接口，避免无意义的第三方访问和“无权限”提示。
 const visitorTotal = ref(0)
 const visitorToday = ref(0)
 const visitorItems = ref([])
 
 const fetchVisitors = async () => {
+  if (isFriendContext.value) return
   const albumId = currentAlbum.value?.id
   if (!albumId) return
   try {
@@ -461,12 +458,12 @@ const fetchVisitors = async () => {
 }
 
 watch(
-  () => currentAlbum.value?.id,
-  (id) => {
+  [() => currentAlbum.value?.id, () => isFriendContext.value],
+  ([id, isFriend]) => {
     visitorTotal.value = 0
     visitorToday.value = 0
     visitorItems.value = []
-    if (id) fetchVisitors()
+    if (id && !isFriend) fetchVisitors()
   },
   { immediate: true }
 )
@@ -860,7 +857,6 @@ const refreshAlbum = async () => {
     }
   }
 }
-
 
 /* 操作区域 */
 .action-section {
@@ -1553,8 +1549,7 @@ const refreshAlbum = async () => {
 
       &.mono {
         font-family:
-          ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono',
-          monospace;
+          ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
         font-size: 11px;
       }
 
