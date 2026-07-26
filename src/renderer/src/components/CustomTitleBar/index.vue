@@ -351,7 +351,9 @@ import { formatBytes } from '@renderer/utils/formatters'
 import { copyToClipboard } from '@renderer/utils'
 import { getUpdateCheckFeedback } from './update-check-feedback'
 
-const UPDATE_CHECK_UI_TIMEOUT_MS = 8000
+// 主进程最多依次等待 R2、GitHub 各 4 秒；多留一点事件派发余量，避免
+// 正常的双源失败结果刚返回时标题栏先误报“检查较慢”。
+const UPDATE_CHECK_UI_TIMEOUT_MS = 9000
 
 // 简单的版本号格式化函数
 const formatVersion = (version) => {

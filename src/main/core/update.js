@@ -1,19 +1,28 @@
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { EventEmitter } from 'events'
+import { load as loadYaml } from 'js-yaml'
 import { IPC_UPDATE } from '@shared/ipc-channels'
 import logger from '@main/core/logger'
-import { app, shell } from 'electron'
+import { app, session, shell } from 'electron'
 import path from 'path'
 import fs from 'fs-extra'
 import { APP_DOWNLOAD_PAGE } from '@shared/const'
 import {
   UPDATE_REQUEST_TIMEOUT_MS,
-  getUpdateCheckRoute,
+  createStableUpdateCheckResult,
+  getGenericLatestMetadataUrl,
+  getGithubLatestMetadataUrl,
+  hasUsableUpdateCheckResult,
   isStableReleaseVersion,
   matchesPinnedUpdateCandidate,
   OFFICIAL_UPDATE_SOURCES,
-  selectCompatibleUpdateFile
+  selectVerifiedUpdateCandidate,
+  selectCompatibleUpdateFile,
+  UPDATE_SELECTION_REASON
 } from '@main/core/update-source'
+
+const UPDATE_METADATA_MAX_BYTES = 1024 * 1024
+const UPDATER_SESSION_PARTITION = 'electron-updater'
 
 export class AutoUpdateManager extends EventEmitter {
   constructor() {
@@ -39,6 +48,7 @@ export class AutoUpdateManager extends EventEmitter {
       downloadCancellationToken: null,
       updateSource: 'r2',
       selectedUpdate: null,
+      updateCheckGeneration: 0,
       suppressSourceError: false,
       suppressUpdateEvents: false
     }
@@ -148,7 +158,8 @@ export class AutoUpdateManager extends EventEmitter {
       autoUpdater.setFeedURL({
         provider: 'generic',
         url: this.config.primaryFeedUrl,
-        // 默认是两分钟；更新检查属于非关键后台操作，不能让一个不可达的源长期占用检查状态。
+        // 下载前的复核使用此 Provider；前台元数据检查由 fetchUpdateMetadata
+        // 执行，避免 Generic Provider 忽略运行时 timeout 而卡住界面。
         timeout: UPDATE_REQUEST_TIMEOUT_MS
       })
       this.state.updateSource = 'r2'
@@ -161,6 +172,7 @@ export class AutoUpdateManager extends EventEmitter {
       owner: this.config.github.owner,
       repo: this.config.github.repo,
       private: false,
+      // 同上：前台检查不用 GitHub Provider，避免稳定检查依赖 releases.atom。
       timeout: UPDATE_REQUEST_TIMEOUT_MS,
       releaseType: this.config.allowPreRelease
         ? 'prerelease'
@@ -399,6 +411,16 @@ export class AutoUpdateManager extends EventEmitter {
 
     // 错误类型映射
     const errorPatterns = [
+      // 双源元数据冲突
+      {
+        pattern: /UPDATE_SOURCE_CONFLICT|同版本文件不一致/i,
+        info: {
+          message: '更新文件校验异常',
+          detail: '检测到两个官方来源的同版本文件不一致，已停止自动更新，请稍后重试或前往官网下载',
+          canRetry: true,
+          errorType: 'SOURCE_CONFLICT'
+        }
+      },
       // Release 相关
       {
         pattern: /Unable to find latest version|No release found/i,
@@ -492,6 +514,78 @@ export class AutoUpdateManager extends EventEmitter {
     }
   }
 
+  getMetadataUrlForSource(source) {
+    const noCache = `${Date.now().toString(32)}-${Math.random().toString(32).slice(2, 8)}`
+    if (source === 'primary') {
+      return getGenericLatestMetadataUrl(this.config.primaryFeedUrl, this.architecture, noCache)
+    }
+    return getGithubLatestMetadataUrl(this.config.github, this.architecture, noCache)
+  }
+
+  /**
+   * 只读取最新版本元数据，不让 electron-updater 的 Generic/GitHub Provider
+   * 参与前台检查。这样 R2 可以被真正设置超时，GitHub 也不会请求 releases.atom。
+   * 下载前仍会由 prepareSelectedUpdateSource 重新调用 electron-updater，并对
+   * 版本、架构、大小和 SHA-512 做一次钉死比对。
+   */
+  async fetchUpdateMetadata(source) {
+    const sourceName = source === 'primary' ? 'R2' : 'GitHub'
+    const metadataUrl = this.getMetadataUrlForSource(source)
+    if (!metadataUrl) {
+      return { result: null, error: new Error(`${sourceName} 更新地址无效`) }
+    }
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), UPDATE_REQUEST_TIMEOUT_MS)
+
+    try {
+      // 与 electron-updater 使用同一个无缓存 session，遵循系统代理设置，便于
+      // 企业代理、Charles/Fiddler 等环境下复现与诊断。
+      const updateSession = session.fromPartition(UPDATER_SESSION_PARTITION, { cache: false })
+      const response = await updateSession.fetch(metadataUrl, {
+        headers: {
+          Accept: 'application/x-yaml, text/yaml, text/plain',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        },
+        signal: controller.signal
+      })
+
+      if (!response.ok) {
+        throw new Error(`${sourceName} 更新元数据请求失败: HTTP ${response.status}`)
+      }
+
+      const contentLength = Number(response.headers.get('content-length') || 0)
+      if (Number.isFinite(contentLength) && contentLength > UPDATE_METADATA_MAX_BYTES) {
+        throw new Error(`${sourceName} 更新元数据过大`)
+      }
+
+      const rawMetadata = await response.text()
+      if (Buffer.byteLength(rawMetadata, 'utf8') > UPDATE_METADATA_MAX_BYTES) {
+        throw new Error(`${sourceName} 更新元数据过大`)
+      }
+
+      const updateInfo = loadYaml(rawMetadata)
+      const result = createStableUpdateCheckResult(updateInfo, app.getVersion())
+      if (!result) {
+        throw new Error(`${sourceName} 更新元数据无效`)
+      }
+
+      return { result, error: null }
+    } catch (error) {
+      const isTimedOut = controller.signal.aborted
+      const normalizedError = isTimedOut
+        ? new Error(`${sourceName} 更新检查超时`)
+        : error instanceof Error
+          ? error
+          : new Error(String(error || `${sourceName} 更新检查失败`))
+      logger.warn(`[更新] ${sourceName} 元数据检查失败:`, normalizedError.message)
+      return { result: null, error: normalizedError }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   /**
    * 检查更新
    */
@@ -519,54 +613,80 @@ export class AutoUpdateManager extends EventEmitter {
       })
 
       this.state.selectedUpdate = null
+      const updateCheckGeneration = ++this.state.updateCheckGeneration
       this.state.isCheckingForUpdate = true
       this.sendToRenderer(IPC_UPDATE.CHECKING)
       this.state.suppressSourceError = true
       this.state.suppressUpdateEvents = true
 
-      const r2Check = await this.checkUpdateSource('primary')
+      // R2 负责优先分发；GitHub 是独立的公开备用源。即使 R2 返回“当前版本”，
+      // 也继续检查 GitHub。两端有不同版本时选择更高版本；相同版本但包哈希
+      // 不一致时停止自动更新，避免在冲突的文件间猜测。
+      const r2Check = await this.fetchUpdateMetadata('primary')
       const r2Candidate = this.createUpdateCandidate('r2', r2Check.result)
-      const updateCheckRoute = getUpdateCheckRoute(r2Check.result, r2Candidate)
 
-      // R2 有可用且完整的更新时，立即结束检查；GitHub 绝不参与抢占。
-      if (updateCheckRoute === 'r2-update') {
+      if (hasUsableUpdateCheckResult(r2Check.result, r2Candidate)) {
         this.state.suppressUpdateEvents = false
         this.state.suppressSourceError = false
-        this.state.selectedUpdate = r2Candidate
-        this.publishAvailableUpdate(r2Candidate.updateInfo)
-        return this.formatUpdateInfo(r2Candidate.updateInfo)
-      }
 
-      // R2 已明确回应当前稳定版本，立即结束检查。GitHub 不参与常规补查，
-      // 避免尚未同步到 R2 的验证版本提前推送给普通用户。
-      if (updateCheckRoute === 'r2-current') {
-        this.state.suppressUpdateEvents = false
-        this.state.suppressSourceError = false
-        this.publishNoUpdate(r2Check.result.updateInfo)
+        if (r2Candidate) {
+          this.state.selectedUpdate = r2Candidate
+          this.state.updateSource = 'r2'
+          this.publishAvailableUpdate(r2Candidate.updateInfo)
+        } else {
+          this.publishNoUpdate(r2Check.result.updateInfo)
+        }
+
+        // GitHub 仅作后台交叉核验：不占用 electron-updater，因而不会和用户
+        // 已开始的 R2 下载竞争 provider 或下载状态。
+        void this.verifyGithubUpdateInBackground(r2Candidate, updateCheckGeneration)
         return this.formatUpdateInfo(r2Check.result.updateInfo)
       }
 
-      // R2 没有返回可用元数据时，GitHub 才作为前台兜底源接管检查。
-      const githubCheck = await this.checkUpdateSource('github')
+      // R2 失联、元数据异常或不含当前架构包时，GitHub 立即接管前台检查。
+      const githubCheck = await this.fetchUpdateMetadata('github')
       const githubCandidate = this.createUpdateCandidate('github', githubCheck.result)
-      if (!githubCandidate && !githubCheck.result) {
+
+      const selection = selectVerifiedUpdateCandidate({
+        r2Candidate,
+        githubCandidate,
+        githubResponded: Boolean(githubCheck.result),
+        architecture: this.architecture
+      })
+
+      if (!selection.candidate && !r2Check.result && !githubCheck.result) {
         throw r2Check.error || githubCheck.error || new Error('更新服务暂不可用')
+      }
+
+      if (selection.reason === UPDATE_SELECTION_REASON.METADATA_CONFLICT) {
+        const error = new Error('两个官方更新来源的同版本文件不一致')
+        error.code = 'UPDATE_SOURCE_CONFLICT'
+        throw error
       }
 
       this.state.suppressUpdateEvents = false
       this.state.suppressSourceError = false
-      if (githubCandidate) {
-        this.state.selectedUpdate = githubCandidate
-        this.publishAvailableUpdate(githubCandidate.updateInfo)
-        return this.formatUpdateInfo(githubCandidate.updateInfo)
+      if (selection.candidate) {
+        this.state.selectedUpdate = selection.candidate
+        // GitHub 已核验但与 R2 同包时，仍保持 R2 为下载源。下载前会再次
+        // 请求 R2 并比对当前候选，避免 GitHub 检查覆盖 electron-updater 内部 provider。
+        this.state.updateSource = selection.candidate.source
+        logger.info('[更新] 已选择更新候选', {
+          source: selection.candidate.source,
+          version: selection.candidate.updateInfo.version,
+          verification: selection.reason
+        })
+        this.publishAvailableUpdate(selection.candidate.updateInfo)
+        return this.formatUpdateInfo(selection.candidate.updateInfo)
       }
 
-      this.publishNoUpdate(githubCheck.result.updateInfo)
-      return this.formatUpdateInfo(githubCheck.result.updateInfo)
+      const currentInfo = r2Check.result?.updateInfo || githubCheck.result?.updateInfo
+      this.publishNoUpdate(currentInfo)
+      return this.formatUpdateInfo(currentInfo)
     } catch (error) {
       this.state.isCheckingForUpdate = false
       const errorInfo = this.parseError(error)
-      throw new Error(errorInfo.message)
+      throw Object.assign(new Error(errorInfo.message), errorInfo)
     } finally {
       this.state.isCheckingForUpdate = false
       this.state.suppressSourceError = false
@@ -586,6 +706,54 @@ export class AutoUpdateManager extends EventEmitter {
     }
   }
 
+  /**
+   * R2 已快速回应后，在后台读取 GitHub 的稳定版 latest*.yml。
+   * 这里不用 autoUpdater，避免改变正在准备下载的 R2 provider。真正下载时会
+   * 重新交给 autoUpdater 读取一次同一来源并进行完整哈希校验。
+   */
+  async verifyGithubUpdateInBackground(r2Candidate, updateCheckGeneration) {
+    if (this.config.allowPreRelease) return
+
+    try {
+      const githubMetadata = await this.fetchUpdateMetadata('github')
+      if (!githubMetadata.result) return
+
+      const githubCandidate = this.createUpdateCandidate('github', githubMetadata.result)
+      const selection = selectVerifiedUpdateCandidate({
+        r2Candidate,
+        githubCandidate,
+        githubResponded: true,
+        architecture: this.architecture
+      })
+
+      // 新一轮前台检查或用户已开始下载时，不用延迟返回的数据覆盖当前选择。
+      if (updateCheckGeneration !== this.state.updateCheckGeneration || this.state.isDownloading) {
+        return
+      }
+
+      if (selection.reason === UPDATE_SELECTION_REASON.METADATA_CONFLICT) {
+        const error = new Error('两个官方更新来源的同版本文件不一致')
+        error.code = 'UPDATE_SOURCE_CONFLICT'
+        this.state.selectedUpdate = null
+        this.sendToRenderer(IPC_UPDATE.ERROR, this.parseError(error))
+        return
+      }
+
+      // R2 已是更高版本、两端相同或 GitHub 没有更新时，不打扰用户。
+      if (!selection.candidate || selection.candidate.source === 'r2') return
+
+      this.state.selectedUpdate = selection.candidate
+      this.state.updateSource = 'github'
+      logger.info('[更新] GitHub 后台核验发现更高版本', {
+        version: selection.candidate.updateInfo.version
+      })
+      this.publishAvailableUpdate(selection.candidate.updateInfo)
+    } catch (error) {
+      // R2 的结果已经交给用户；后台核验失败只记录，不额外制造失败弹窗。
+      logger.warn(`[更新] GitHub 后台核验失败: ${error?.message || error}`)
+    }
+  }
+
   createUpdateCandidate(source, result) {
     const updateInfo = result?.updateInfo
     if (!isStableReleaseVersion(updateInfo?.version)) return null
@@ -600,6 +768,41 @@ export class AutoUpdateManager extends EventEmitter {
       source,
       result,
       updateInfo
+    }
+  }
+
+  /**
+   * 展示更新后，下载前从已选择来源重新读取元数据，并要求版本、架构、
+   * 文件大小与 SHA-512 完全不变。不读取 updater 私有字段。
+   */
+  async prepareSelectedUpdateSource() {
+    const selected = this.state.selectedUpdate
+    if (!selected?.source) return
+
+    this.state.suppressUpdateEvents = true
+    this.state.suppressSourceError = true
+    try {
+      const source = selected.source === 'github' ? 'github' : 'primary'
+      const sourceName = selected.source === 'github' ? 'GitHub' : 'R2'
+      const sourceCheck = await this.checkUpdateSource(source)
+      const refreshedCandidate = this.createUpdateCandidate(selected.source, sourceCheck.result)
+
+      if (
+        !refreshedCandidate ||
+        !matchesPinnedUpdateCandidate(
+          selected.updateInfo,
+          refreshedCandidate.updateInfo,
+          this.architecture
+        )
+      ) {
+        throw new Error(`${sourceName} 更新信息已变化，请重新检查更新`)
+      }
+
+      this.state.selectedUpdate = refreshedCandidate
+      this.state.updateSource = selected.source
+    } finally {
+      this.state.suppressUpdateEvents = false
+      this.state.suppressSourceError = false
     }
   }
 
@@ -639,6 +842,7 @@ export class AutoUpdateManager extends EventEmitter {
 
       // 保持完整包校验，切换更新源时不复用差分包。
       autoUpdater.disableDifferentialDownload = true
+      await this.prepareSelectedUpdateSource()
       let hasRetriedAfterVerificationFailure = false
 
       try {
@@ -941,6 +1145,7 @@ export class AutoUpdateManager extends EventEmitter {
         downloadCancellationToken: null,
         updateSource: 'r2',
         selectedUpdate: null,
+        updateCheckGeneration: 0,
         suppressSourceError: false,
         suppressUpdateEvents: false
       }

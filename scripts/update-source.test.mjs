@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createStableUpdateCheckResult,
+  getGenericLatestMetadataUrl,
+  getGithubLatestMetadataUrl,
+  getUpdaterMetadataFilename,
+  hasUsableUpdateCheckResult,
   UPDATE_REQUEST_TIMEOUT_MS,
-  getUpdateCheckRoute,
   matchesPinnedUpdateCandidate,
   selectCompatibleUpdateFile,
-  UPDATE_CHECK_ROUTE
+  selectVerifiedUpdateCandidate,
+  UPDATE_SELECTION_REASON
 } from '../src/main/core/update-source.js'
 
 const sha512 = `${'A'.repeat(86)}==`
@@ -19,38 +24,185 @@ function windowsAsset(version = '2.7.1', overrides = {}) {
   }
 }
 
-test('routes every R2 result deterministically before considering GitHub', () => {
-  const updateInfo = { version: '2.7.1', files: [windowsAsset()] }
-  const candidate = { updateInfo }
+test('uses R2 only when GitHub confirms the same release asset', () => {
+  const architecture = { platform: 'win32', arch: 'x64' }
+  const r2Candidate = { source: 'r2', updateInfo: { version: '2.7.1', files: [windowsAsset()] } }
+  const githubCandidate = {
+    source: 'github',
+    updateInfo: {
+      version: '2.7.1',
+      files: [windowsAsset('2.7.1', { url: 'QzonePhoto-2.7.1-win-x64-setup.exe' })]
+    }
+  }
 
-  assert.equal(
-    getUpdateCheckRoute({ isUpdateAvailable: true, updateInfo }, candidate),
-    UPDATE_CHECK_ROUTE.R2_UPDATE
-  )
-  assert.equal(
-    getUpdateCheckRoute({ isUpdateAvailable: false, updateInfo }, null),
-    UPDATE_CHECK_ROUTE.R2_CURRENT
-  )
-  assert.equal(getUpdateCheckRoute(null, null), UPDATE_CHECK_ROUTE.GITHUB_FALLBACK)
-  assert.equal(
-    getUpdateCheckRoute({ isUpdateAvailable: true, updateInfo }, null),
-    UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
-  )
-  assert.equal(
-    getUpdateCheckRoute({ isUpdateAvailable: true, updateInfo: { version: '2.7.1' } }, null),
-    UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
-  )
-  assert.equal(
-    getUpdateCheckRoute(
-      { isUpdateAvailable: false, updateInfo: { version: '2.7.1-beta.1' } },
-      null
-    ),
-    UPDATE_CHECK_ROUTE.GITHUB_FALLBACK
-  )
+  const selection = selectVerifiedUpdateCandidate({
+    r2Candidate,
+    githubCandidate,
+    githubResponded: true,
+    architecture
+  })
+
+  assert.equal(selection.candidate, r2Candidate)
+  assert.equal(selection.reason, UPDATE_SELECTION_REASON.R2_VERIFIED)
+})
+
+test('uses the higher version from either official source', () => {
+  const architecture = { platform: 'win32', arch: 'x64' }
+  const r2Candidate = { source: 'r2', updateInfo: { version: '2.7.1', files: [windowsAsset()] } }
+  const githubNewer = {
+    source: 'github',
+    updateInfo: {
+      version: '2.7.2',
+      files: [windowsAsset('2.7.2', { url: 'QzonePhoto-2.7.2-win-x64-setup.exe' })]
+    }
+  }
+  const r2Newer = {
+    source: 'r2',
+    updateInfo: {
+      version: '2.7.2',
+      files: [windowsAsset('2.7.2')]
+    }
+  }
+
+  const githubOlder = {
+    source: 'github',
+    updateInfo: {
+      version: '2.7.0',
+      files: [windowsAsset('2.7.0', { url: 'QzonePhoto-2.7.0-win-x64-setup.exe' })]
+    }
+  }
+
+  const githubSelection = selectVerifiedUpdateCandidate({
+    r2Candidate,
+    githubCandidate: githubNewer,
+    githubResponded: true,
+    architecture
+  })
+  assert.equal(githubSelection.candidate, githubNewer)
+  assert.equal(githubSelection.reason, UPDATE_SELECTION_REASON.GITHUB_NEWER)
+
+  const r2Selection = selectVerifiedUpdateCandidate({
+    r2Candidate: r2Newer,
+    githubCandidate: githubOlder,
+    githubResponded: true,
+    architecture
+  })
+  assert.equal(r2Selection.candidate, r2Newer)
+  assert.equal(r2Selection.reason, UPDATE_SELECTION_REASON.R2_NEWER)
+})
+
+test('allows one source to offer a newer update while the other is current or unavailable', () => {
+  const architecture = { platform: 'win32', arch: 'x64' }
+  const r2Candidate = { source: 'r2', updateInfo: { version: '2.7.1', files: [windowsAsset()] } }
+
+  const githubCurrent = selectVerifiedUpdateCandidate({
+    r2Candidate,
+    githubCandidate: null,
+    githubResponded: true,
+    architecture
+  })
+  assert.equal(githubCurrent.candidate, r2Candidate)
+  assert.equal(githubCurrent.reason, UPDATE_SELECTION_REASON.R2_UNVERIFIED)
+
+  const githubUnavailable = selectVerifiedUpdateCandidate({
+    r2Candidate,
+    githubCandidate: null,
+    githubResponded: false,
+    architecture
+  })
+  assert.equal(githubUnavailable.candidate, r2Candidate)
+  assert.equal(githubUnavailable.reason, UPDATE_SELECTION_REASON.R2_UNVERIFIED)
+
+  const githubCandidate = {
+    source: 'github',
+    updateInfo: {
+      version: '2.7.1',
+      files: [windowsAsset('2.7.1', { url: 'QzonePhoto-2.7.1-win-x64-setup.exe' })]
+    }
+  }
+  const r2Current = selectVerifiedUpdateCandidate({
+    r2Candidate: null,
+    githubCandidate,
+    githubResponded: true,
+    architecture
+  })
+  assert.equal(r2Current.candidate, githubCandidate)
+  assert.equal(r2Current.reason, UPDATE_SELECTION_REASON.GITHUB_ONLY)
+})
+
+test('blocks automatic update when the same version has different package metadata', () => {
+  const architecture = { platform: 'win32', arch: 'x64' }
+  const r2Candidate = { source: 'r2', updateInfo: { version: '2.7.1', files: [windowsAsset()] } }
+  const githubCandidate = {
+    source: 'github',
+    updateInfo: {
+      version: '2.7.1',
+      files: [windowsAsset('2.7.1', { url: 'QzonePhoto-2.7.1-win-x64-setup.exe', size: 999 })]
+    }
+  }
+
+  const selection = selectVerifiedUpdateCandidate({
+    r2Candidate,
+    githubCandidate,
+    githubResponded: true,
+    architecture
+  })
+  assert.equal(selection.candidate, null)
+  assert.equal(selection.reason, UPDATE_SELECTION_REASON.METADATA_CONFLICT)
 })
 
 test('uses a short, explicit request timeout instead of electron-updater default', () => {
-  assert.equal(UPDATE_REQUEST_TIMEOUT_MS, 8_000)
+  assert.equal(UPDATE_REQUEST_TIMEOUT_MS, 4_000)
+})
+
+test('lets R2 finish the foreground check only with usable stable metadata', () => {
+  const result = { updateInfo: { version: '2.7.1' }, isUpdateAvailable: false }
+  const candidate = {
+    source: 'r2',
+    updateInfo: { version: '2.7.2', files: [windowsAsset('2.7.2')] }
+  }
+
+  assert.equal(hasUsableUpdateCheckResult(result, null), true)
+  assert.equal(
+    hasUsableUpdateCheckResult(
+      { updateInfo: candidate.updateInfo, isUpdateAvailable: true },
+      candidate
+    ),
+    true
+  )
+  assert.equal(
+    hasUsableUpdateCheckResult({ updateInfo: candidate.updateInfo, isUpdateAvailable: true }, null),
+    false
+  )
+  assert.equal(hasUsableUpdateCheckResult({ updateInfo: { version: '2.7.1-beta.1' } }, null), false)
+})
+
+test('builds fixed-source metadata URLs without making them a download authority', () => {
+  const github = { owner: '11273', repo: 'QzonePhoto' }
+  assert.equal(getUpdaterMetadataFilename({ platform: 'win32' }), 'latest.yml')
+  assert.equal(getUpdaterMetadataFilename({ platform: 'darwin' }), 'latest-mac.yml')
+  assert.equal(getUpdaterMetadataFilename({ platform: 'linux' }), 'latest-linux.yml')
+  assert.equal(
+    getGithubLatestMetadataUrl(github, { platform: 'darwin' }),
+    'https://github.com/11273/QzonePhoto/releases/latest/download/latest-mac.yml'
+  )
+  assert.equal(
+    getGenericLatestMetadataUrl(
+      'https://dl.qzonephoto.getgit.one/releases/latest',
+      { platform: 'win32' },
+      'test'
+    ),
+    'https://dl.qzonephoto.getgit.one/releases/latest/latest.yml?noCache=test'
+  )
+  assert.equal(getGenericLatestMetadataUrl('http://example.invalid', { platform: 'win32' }), '')
+  assert.equal(getGithubLatestMetadataUrl({ owner: 'bad/path', repo: 'QzonePhoto' }), '')
+})
+
+test('turns GitHub stable metadata into an update result only when it is newer', () => {
+  const updateInfo = { version: '2.7.1', files: [windowsAsset()] }
+  assert.equal(createStableUpdateCheckResult(updateInfo, '2.7.0').isUpdateAvailable, true)
+  assert.equal(createStableUpdateCheckResult(updateInfo, '2.7.1').isUpdateAvailable, false)
+  assert.equal(createStableUpdateCheckResult({ version: '2.7.1-beta.1' }, '2.7.0'), null)
 })
 
 test('only accepts the exact versioned R2 asset for the current platform', () => {
