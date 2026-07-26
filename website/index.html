@@ -12,12 +12,15 @@
       name="keywords"
       content="QQ空间相册下载,QQ空间备份,QQ空间照片导出,QQ空间视频下载,企鹅相册,Qzone Photo"
     />
-    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
     <link rel="canonical" href="https://qzonephoto.getgit.one/" />
     <link rel="icon" href="./assets/icons/app.png" />
     <meta name="application-name" content="企鹅相册 · QzonePhoto" />
     <meta name="apple-mobile-web-app-title" content="企鹅相册" />
-    <meta name="theme-color" content="#f4f6f8" />
+    <meta name="theme-color" content="#fbfbfd" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:site_name" content="企鹅相册 · QzonePhoto" />
@@ -36,9 +39,15 @@
     <meta property="og:image:alt" content="企鹅相册 · QzonePhoto 的 QQ 空间相册批量下载界面" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="企鹅相册 · QzonePhoto｜QQ 空间相册批量下载与备份" />
-    <meta name="twitter:description" content="开源、跨平台的 QQ 空间相册、原图、视频与动态本地整理工具。" />
-    <meta name="twitter:image" content="https://qzonephoto.getgit.one/assets/screenshots/album.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260724-ui4" />
+    <meta
+      name="twitter:description"
+      content="开源、跨平台的 QQ 空间相册、原图、视频与动态本地整理工具。"
+    />
+    <meta
+      name="twitter:image"
+      content="https://qzonephoto.getgit.one/assets/screenshots/album.png"
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260725-motion" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -98,8 +107,24 @@
         <a aria-current="page" href="./">首页</a>
         <a href="./features/">功能</a>
         <a href="./privacy/">使用帮助</a>
+        <a
+          class="nav-github"
+          data-track="github-nav"
+          href="https://github.com/11273/QzonePhoto"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg aria-hidden="true" viewBox="0 0 16 16">
+            <path
+              d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.39l-.01-1.52c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .22.15.47.55.39A8 8 0 0 0 8 0Z"
+            />
+          </svg>
+          <span>GitHub</span>
+        </a>
         <a class="nav-download" href="#download">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" />
+          </svg>
           下载
         </a>
       </nav>
@@ -109,7 +134,9 @@
       <section id="download" class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> 开源 · 本地处理</p>
-          <h1 id="hero-title">把 QQ 空间相册里的回忆，<span><em>稳稳</em>带回本地。</span></h1>
+          <h1 id="hero-title">
+            把 QQ 空间相册里的回忆，<span><em>稳稳</em>带回本地。</span>
+          </h1>
           <p class="hero-lead">
             把相册、原图、视频和动态，一次保存到自己的电脑。无需注册，也不需要加入群聊。
           </p>
@@ -148,7 +175,10 @@
               aria-controls="platform-choice"
             >
               <span class="system-choice-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="11.5" rx="1.5" /><path d="M8.5 20h7M12 16v4" /></svg>
+                <svg viewBox="0 0 24 24">
+                  <rect x="3.5" y="4.5" width="17" height="11.5" rx="1.5" />
+                  <path d="M8.5 20h7M12 16v4" />
+                </svg>
               </span>
               <span class="system-choice-copy">
                 <strong>选择其他电脑或版本</strong>
@@ -158,7 +188,14 @@
                 <path d="m7 10 5 5 5-5" />
               </svg>
             </button>
-            <div id="platform-choice" class="platform-choice" data-platform-choice aria-hidden="true" inert hidden>
+            <div
+              id="platform-choice"
+              class="platform-choice"
+              data-platform-choice
+              aria-hidden="true"
+              inert
+              hidden
+            >
               <div class="choice-heading">
                 <p>先选择电脑系统</p>
                 <small data-choice-context>不确定时，先看电脑系统名称。</small>
@@ -215,13 +252,15 @@
                       data-download="windows-x64-setup"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=windows-x64-setup&amp;source=home-choice"
-                    ><strong>64 位安装版</strong><small>适合大多数 Windows 电脑</small></a>
+                      ><strong>64 位安装版</strong><small>适合大多数 Windows 电脑</small></a
+                    >
                     <a
                       class="choice-option"
                       data-download="windows-ia32-setup"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=windows-ia32-setup&amp;source=home-choice"
-                    ><strong>32 位安装版</strong><small>仅适用于较旧的 32 位电脑</small></a>
+                      ><strong>32 位安装版</strong><small>仅适用于较旧的 32 位电脑</small></a
+                    >
                   </div>
                 </section>
                 <section
@@ -242,13 +281,15 @@
                       data-download="macos-arm64-dmg"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=macos-arm64-dmg&amp;source=home-choice"
-                    ><strong>Apple 芯片</strong><small>M1、M2、M3、M4、M5</small></a>
+                      ><strong>Apple 芯片</strong><small>M1、M2、M3、M4、M5</small></a
+                    >
                     <a
                       class="choice-option"
                       data-download="macos-x64-dmg"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=macos-x64-dmg&amp;source=home-choice"
-                    ><strong>Intel 芯片</strong><small>搭载 Intel 处理器的 Mac</small></a>
+                      ><strong>Intel 芯片</strong><small>搭载 Intel 处理器的 Mac</small></a
+                    >
                   </div>
                 </section>
                 <section
@@ -269,13 +310,15 @@
                       data-download="linux-x64-appimage"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=linux-x64-appimage&amp;source=home-choice"
-                    ><strong>AppImage</strong><small>通用格式，下载后即可运行</small></a>
+                      ><strong>AppImage</strong><small>通用格式，下载后即可运行</small></a
+                    >
                     <a
                       class="choice-option"
                       data-download="linux-x64-deb"
                       data-source="home-choice"
                       href="https://qzone.getgit.one/api/download?asset=linux-x64-deb&amp;source=home-choice"
-                    ><strong>Deb 安装包</strong><small>Debian、Ubuntu 等系统</small></a>
+                      ><strong>Deb 安装包</strong><small>Debian、Ubuntu 等系统</small></a
+                    >
                   </div>
                 </section>
               </div>
@@ -286,19 +329,23 @@
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <span>查看历史版本</span>
+                <span>在 GitHub 查看历史版本</span>
               </a>
             </div>
             <a
               class="github-release-link"
-              data-github-release
-              data-track="github-download-hero"
-              href="https://github.com/11273/QzonePhoto/releases/latest"
+              data-track="github-project-hero"
+              href="https://github.com/11273/QzonePhoto"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="查看历史版本与其他下载方式，在 GitHub 新标签页打开"
+              aria-label="在 GitHub 查看源代码与版本发布，在新标签页打开"
             >
-              <span>查看历史版本与其他下载方式</span>
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path
+                  d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.39l-.01-1.52c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .22.15.47.55.39A8 8 0 0 0 8 0Z"
+                />
+              </svg>
+              <span>在 GitHub 查看源代码与版本发布</span>
             </a>
             <p class="download-note" data-download-status>支持 Windows、macOS 和 Linux</p>
           </div>
@@ -309,7 +356,7 @@
           </noscript>
         </div>
 
-        <div class="hero-product">
+        <div class="hero-product" data-hero-depth>
           <div class="product-frame">
             <img
               src="./assets/screenshots/album-1440.webp"
@@ -333,19 +380,33 @@
 
       <section class="trust-strip" aria-label="下载特点">
         <div class="trust-item">
-          <span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg></span>
+          <span class="trust-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg
+          ></span>
           <span><strong>直接下载</strong><small>不需要注册官网账号</small></span>
         </div>
         <div class="trust-item">
-          <span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6zM9 12l2 2 4-4" /></svg></span>
+          <span class="trust-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24">
+              <path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6zM9 12l2 2 4-4" /></svg
+          ></span>
           <span><strong>内容留在本地</strong><small>在你的电脑上完成操作</small></span>
         </div>
         <div class="trust-item">
-          <span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="12.5" rx="2" /><path d="M8.5 20h7M12 16.5V20" /></svg></span>
+          <span class="trust-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24">
+              <rect x="3.5" y="4" width="17" height="12.5" rx="2" />
+              <path d="M8.5 20h7M12 16.5V20" /></svg
+          ></span>
           <span><strong>跨平台可用</strong><small>Windows、macOS、Linux</small></span>
         </div>
         <div class="trust-item">
-          <span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 1.5 5.3L19 10l-5.5 1.7L12 17l-1.5-5.3L5 10l5.5-1.7zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" /></svg></span>
+          <span class="trust-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24">
+              <path
+                d="m12 3 1.5 5.3L19 10l-5.5 1.7L12 17l-1.5-5.3L5 10l5.5-1.7zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z"
+              /></svg
+          ></span>
           <span><strong>自动匹配</strong><small>优先推荐适合你的版本</small></span>
         </div>
       </section>
@@ -388,7 +449,10 @@
           <p class="eyebrow">看得见，也管得住</p>
           <h2>熟悉的空间内容，变成清楚的本地资料库。</h2>
           <p>按相册、照片、视频和动态切换；下载进度、失败重试和保存位置都有明确反馈。</p>
-          <a class="text-link" href="./features/">了解全部功能 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h13m-5-5 5 5-5 5" /></svg></a>
+          <a class="text-link" href="./features/"
+            >了解全部功能
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h13m-5-5 5 5-5 5" /></svg
+          ></a>
         </div>
         <div class="shot-stack reveal">
           <figure>
@@ -454,7 +518,11 @@
           </details>
           <details data-faq="warning">
             <summary>Mac 第一次打不开怎么办？</summary>
-            <p>请先确认安装包来自本官网。把应用拖到“应用程序”后，如 macOS 提示无法验证开发者，可在“系统设置 → 隐私与安全性”中选择“仍要打开”；也可以按住 Control 点按应用，再选择“打开”。不需要在终端输入命令。</p>
+            <p>
+              请先确认安装包来自本官网。把应用拖到“应用程序”后，如 macOS
+              提示无法验证开发者，可在“系统设置 → 隐私与安全性”中选择“仍要打开”；也可以按住 Control
+              点按应用，再选择“打开”。不需要在终端输入命令。
+            </p>
           </details>
           <details data-faq="fallback">
             <summary>下载没有开始怎么办？</summary>
@@ -498,13 +566,13 @@
       <nav aria-label="页脚导航">
         <a href="#download">下载</a><a href="./features/">功能</a><a href="./privacy/">使用帮助</a>
         <a data-track="github-footer" href="https://github.com/11273/QzonePhoto" rel="noopener"
-          >源代码</a
+          >GitHub 开源项目</a
         >
       </nav>
       <p>仅下载你有权访问的内容，并遵守相关法律法规。</p>
     </footer>
 
-    <script src="./download-core.js?v=20260724-ui4" defer></script>
-    <script src="./main.js?v=20260724-ui4" defer></script>
+    <script src="./download-core.js?v=20260725-motion" defer></script>
+    <script src="./main.js?v=20260725-motion" defer></script>
   </body>
 </html>

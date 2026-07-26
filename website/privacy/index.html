@@ -8,26 +8,35 @@
       name="description"
       content="企鹅相册 · QzonePhoto 的下载、macOS 首次打开、本地处理方式、隐私说明与问题反馈指引。"
     />
-    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
     <link rel="canonical" href="https://qzonephoto.getgit.one/privacy/" />
     <link rel="icon" href="../assets/icons/app.png" />
     <meta name="application-name" content="企鹅相册 · QzonePhoto" />
-    <meta name="theme-color" content="#f4f6f8" />
+    <meta name="theme-color" content="#fbfbfd" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:site_name" content="企鹅相册 · QzonePhoto" />
     <meta property="og:title" content="企鹅相册 · QzonePhoto 使用帮助与隐私说明" />
     <meta property="og:description" content="下载、安装、本地处理与问题反馈说明。" />
     <meta property="og:url" content="https://qzonephoto.getgit.one/privacy/" />
-    <meta property="og:image" content="https://qzonephoto.getgit.one/assets/screenshots/album.png" />
+    <meta
+      property="og:image"
+      content="https://qzonephoto.getgit.one/assets/screenshots/album.png"
+    />
     <meta property="og:image:width" content="2160" />
     <meta property="og:image:height" content="1500" />
     <meta property="og:image:alt" content="企鹅相册 · QzonePhoto 的桌面端相册整理界面" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="企鹅相册 · QzonePhoto 使用帮助与隐私说明" />
     <meta name="twitter:description" content="下载、安装、本地处理与问题反馈说明。" />
-    <meta name="twitter:image" content="https://qzonephoto.getgit.one/assets/screenshots/album.png" />
-    <link rel="stylesheet" href="../styles.css?v=20260724-ui4" />
+    <meta
+      name="twitter:image"
+      content="https://qzonephoto.getgit.one/assets/screenshots/album.png"
+    />
+    <link rel="stylesheet" href="../styles.css?v=20260725-motion" />
   </head>
   <body data-page="privacy">
     <a class="skip-link" href="#main">跳到主要内容</a>
@@ -49,7 +58,23 @@
         <a href="../">首页</a>
         <a href="../features/">功能</a>
         <a aria-current="page" href="./">使用帮助</a>
-        <a class="nav-download" href="../#download"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>下载</a>
+        <a
+          class="nav-github"
+          data-track="github-nav"
+          href="https://github.com/11273/QzonePhoto"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><svg aria-hidden="true" viewBox="0 0 16 16">
+            <path
+              d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.39l-.01-1.52c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .22.15.47.55.39A8 8 0 0 0 8 0Z"
+            /></svg
+          ><span>GitHub</span></a
+        >
+        <a class="nav-download" href="../#download"
+          ><svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg
+          >下载</a
+        >
       </nav>
     </header>
 
@@ -74,7 +99,8 @@
           <span class="privacy-index">02</span>
           <h2>版本选择和下载</h2>
           <p>
-            官网会优先推荐适合当前电脑的安装包；不确定时，也可以自行选择 Windows、macOS 或 Linux 版本。
+            官网会优先推荐适合当前电脑的安装包；不确定时，也可以自行选择 Windows、macOS 或 Linux
+            版本。
           </p>
         </article>
         <article>
@@ -96,7 +122,9 @@
         <details data-faq="download-fallback">
           <summary>不知道该下载哪个版本？</summary>
           <p>
-            官网会优先推荐当前电脑可用的版本。Windows 大多数用户选择 64 位安装版；Mac 在“关于本机”中查看是 Apple 芯片还是 Intel。下载没有开始时，返回首页选择其他系统或版本，或
+            官网会优先推荐当前电脑可用的版本。Windows 大多数用户选择 64 位安装版；Mac
+            在“关于本机”中查看是 Apple 芯片还是
+            Intel。下载没有开始时，返回首页选择其他系统或版本，或
             <a
               data-github-release
               href="https://github.com/11273/QzonePhoto/releases/latest"
@@ -115,7 +143,10 @@
         <details data-faq="macos-warning">
           <summary>Mac 第一次打不开怎么办？</summary>
           <div class="faq-answer">
-            <p>当前开源版本尚未完成 Apple 开发者签名与公证。请只在确认来自 qzonephoto.getgit.one 后，按下面方式打开：</p>
+            <p>
+              当前开源版本尚未完成 Apple 开发者签名与公证。请只在确认来自 qzonephoto.getgit.one
+              后，按下面方式打开：
+            </p>
             <ol class="help-steps">
               <li>打开下载的 DMG，把“企鹅相册”拖进“应用程序”。</li>
               <li>首次打开若被拦截，前往“系统设置 → 隐私与安全性”。</li>
@@ -126,7 +157,10 @@
         </details>
         <details data-faq="logs">
           <summary>提交反馈会包含我的内容吗？</summary>
-          <p>不会自动上传 QQ 空间内容。只有你主动提交问题时才会发送你确认过的必要信息；提交前请先阅读提示。</p>
+          <p>
+            不会自动上传 QQ
+            空间内容。只有你主动提交问题时才会发送你确认过的必要信息；提交前请先阅读提示。
+          </p>
         </details>
       </section>
     </main>
@@ -142,6 +176,9 @@
       <nav aria-label="页脚导航">
         <a href="../#download">下载</a>
         <a href="../features/">功能</a>
+        <a data-track="github-footer" href="https://github.com/11273/QzonePhoto" rel="noopener"
+          >GitHub 开源项目</a
+        >
         <a
           data-track="issues-footer"
           href="https://github.com/11273/QzonePhoto/issues"
@@ -164,44 +201,54 @@
             "breadcrumb": {
               "@type": "BreadcrumbList",
               "itemListElement": [
-                { "@type": "ListItem", "position": 1, "name": "首页", "item": "https://qzonephoto.getgit.one/" },
-                { "@type": "ListItem", "position": 2, "name": "使用帮助", "item": "https://qzonephoto.getgit.one/privacy/" }
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "首页",
+                  "item": "https://qzonephoto.getgit.one/"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "使用帮助",
+                  "item": "https://qzonephoto.getgit.one/privacy/"
+                }
               ]
             }
           },
           {
             "@type": "FAQPage",
             "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "应用会上传我的 QQ 空间内容吗？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "不会。空间内容只在本地展示和下载，官网不会接收照片、视频、动态正文或 Cookie。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "不知道该下载哪个版本？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "官网会优先推荐当前电脑可用的版本。Windows 大多数用户选择 64 位安装版；Mac 可在关于本机查看是 Apple 芯片还是 Intel。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Mac 第一次打不开怎么办？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "请确认安装包来自 qzonephoto.getgit.one。把应用拖进应用程序后，若首次打开被拦截，前往系统设置的隐私与安全性，选择仍要打开；也可以按住 Control 点按应用后选择打开。不需要在终端输入命令。"
-            }
-          }
+              {
+                "@type": "Question",
+                "name": "应用会上传我的 QQ 空间内容吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。空间内容只在本地展示和下载，官网不会接收照片、视频、动态正文或 Cookie。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "不知道该下载哪个版本？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "官网会优先推荐当前电脑可用的版本。Windows 大多数用户选择 64 位安装版；Mac 可在关于本机查看是 Apple 芯片还是 Intel。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Mac 第一次打不开怎么办？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "请确认安装包来自 qzonephoto.getgit.one。把应用拖进应用程序后，若首次打开被拦截，前往系统设置的隐私与安全性，选择仍要打开；也可以按住 Control 点按应用后选择打开。不需要在终端输入命令。"
+                }
+              }
             ]
           }
         ]
       }
     </script>
-    <script src="../download-core.js?v=20260724-ui4" defer></script>
-    <script src="../main.js?v=20260724-ui4" defer></script>
+    <script src="../download-core.js?v=20260725-motion" defer></script>
+    <script src="../main.js?v=20260725-motion" defer></script>
   </body>
 </html>

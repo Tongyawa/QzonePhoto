@@ -8,11 +8,14 @@
       name="description"
       content="了解企鹅相册 · QzonePhoto 的 QQ 空间相册下载、照片与视频整理、动态备份、上传下载队列和本地处理能力。"
     />
-    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
     <link rel="canonical" href="https://qzonephoto.getgit.one/features/" />
     <link rel="icon" href="../assets/icons/app.png" />
     <meta name="application-name" content="企鹅相册 · QzonePhoto" />
-    <meta name="theme-color" content="#f4f6f8" />
+    <meta name="theme-color" content="#fbfbfd" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:site_name" content="企鹅相册 · QzonePhoto" />
@@ -32,8 +35,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="企鹅相册 · QzonePhoto 功能介绍" />
     <meta name="twitter:description" content="相册、照片、视频、动态与下载整理功能说明。" />
-    <meta name="twitter:image" content="https://qzonephoto.getgit.one/assets/screenshots/photos.png" />
-    <link rel="stylesheet" href="../styles.css?v=20260724-ui4" />
+    <meta
+      name="twitter:image"
+      content="https://qzonephoto.getgit.one/assets/screenshots/photos.png"
+    />
+    <link rel="stylesheet" href="../styles.css?v=20260725-motion" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -45,8 +51,18 @@
         "breadcrumb": {
           "@type": "BreadcrumbList",
           "itemListElement": [
-            { "@type": "ListItem", "position": 1, "name": "首页", "item": "https://qzonephoto.getgit.one/" },
-            { "@type": "ListItem", "position": 2, "name": "功能", "item": "https://qzonephoto.getgit.one/features/" }
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "首页",
+              "item": "https://qzonephoto.getgit.one/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "功能",
+              "item": "https://qzonephoto.getgit.one/features/"
+            }
           ]
         }
       }
@@ -72,7 +88,23 @@
         <a href="../">首页</a>
         <a aria-current="page" href="./">功能</a>
         <a href="../privacy/">使用帮助</a>
-        <a class="nav-download" href="../#download"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>下载</a>
+        <a
+          class="nav-github"
+          data-track="github-nav"
+          href="https://github.com/11273/QzonePhoto"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><svg aria-hidden="true" viewBox="0 0 16 16">
+            <path
+              d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.39l-.01-1.52c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .22.15.47.55.39A8 8 0 0 0 8 0Z"
+            /></svg
+          ><span>GitHub</span></a
+        >
+        <a class="nav-download" href="../#download"
+          ><svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg
+          >下载</a
+        >
       </nav>
     </header>
 
@@ -239,7 +271,8 @@
             <strong>好友空间</strong><span>搜索、进入、返回和刷新都顺着日常使用习惯安排。</span>
           </article>
           <article>
-            <strong>展示保护</strong><span>需要演示或截图时，媒体、头像、昵称、正文和评论都可遮罩。</span>
+            <strong>展示保护</strong
+            ><span>需要演示或截图时，媒体、头像、昵称、正文和评论都可遮罩。</span>
           </article>
           <article>
             <strong>问题反馈</strong><span>遇到打不开、白屏或内容不显示时，可按提示提交反馈。</span>
@@ -272,12 +305,12 @@
         <a href="../#download">下载</a>
         <a href="../privacy/">使用帮助</a>
         <a data-track="github-footer" href="https://github.com/11273/QzonePhoto" rel="noopener"
-          >源代码</a
+          >GitHub 开源项目</a
         >
       </nav>
     </footer>
 
-    <script src="../download-core.js?v=20260724-ui4" defer></script>
-    <script src="../main.js?v=20260724-ui4" defer></script>
+    <script src="../download-core.js?v=20260725-motion" defer></script>
+    <script src="../main.js?v=20260725-motion" defer></script>
   </body>
 </html>

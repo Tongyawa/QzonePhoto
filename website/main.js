@@ -7,7 +7,7 @@
   const config = {
     apiBaseUrl: 'https://qzone.getgit.one',
     manifestUrls: manifestUrls(),
-    siteVersion: '2026.07.12'
+    siteVersion: '2026.07.26'
   }
   const MANIFEST_REQUEST_TIMEOUT_MS = 1800
   const MANIFEST_TOTAL_TIMEOUT_MS = 3400
@@ -31,6 +31,7 @@
 
   setupNavigation()
   setupScrollChrome()
+  setupSurfaceMotion()
   setupReveal()
   setupChoices()
   setupDownloadLinks()
@@ -82,22 +83,29 @@
     const toggle = document.querySelector('[data-nav-toggle]')
     const nav = document.querySelector('[data-nav]')
     if (!toggle || !nav) return
+    const closeNavigation = () => {
+      nav.classList.remove('open')
+      toggle.setAttribute('aria-expanded', 'false')
+      toggle.setAttribute('aria-label', '打开导航')
+    }
     toggle.addEventListener('click', () => {
       const open = !nav.classList.contains('open')
       nav.classList.toggle('open', open)
       toggle.setAttribute('aria-expanded', String(open))
       toggle.setAttribute('aria-label', open ? '关闭导航' : '打开导航')
     })
-    nav.addEventListener('click', () => {
-      nav.classList.remove('open')
-      toggle.setAttribute('aria-expanded', 'false')
-      toggle.setAttribute('aria-label', '打开导航')
+    nav.addEventListener('click', closeNavigation)
+    document.addEventListener('pointerdown', (event) => {
+      if (!nav.classList.contains('open')) return
+      if (nav.contains(event.target) || toggle.contains(event.target)) return
+      closeNavigation()
     })
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return
-      nav.classList.remove('open')
-      toggle.setAttribute('aria-expanded', 'false')
-      toggle.setAttribute('aria-label', '打开导航')
+      closeNavigation()
+    })
+    window.matchMedia('(max-width: 860px)').addEventListener('change', (event) => {
+      if (!event.matches) closeNavigation()
     })
 
     if (document.body.dataset.page !== 'home') return
@@ -131,6 +139,72 @@
     }
     update()
     window.addEventListener('scroll', requestUpdate, { passive: true })
+  }
+
+  function setupSurfaceMotion() {
+    if (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      !window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    ) {
+      return
+    }
+
+    const stage = document.querySelector('[data-hero-depth]')
+    const frame = stage?.querySelector('.product-frame')
+    if (stage && frame) {
+      let pendingPoint = null
+      let frameId = 0
+
+      const renderDepth = () => {
+        frameId = 0
+        if (!pendingPoint) return
+        const rect = frame.getBoundingClientRect()
+        const x = Math.max(0, Math.min(1, (pendingPoint.clientX - rect.left) / rect.width))
+        const y = Math.max(0, Math.min(1, (pendingPoint.clientY - rect.top) / rect.height))
+        stage.style.setProperty('--depth-x', `${((x - 0.5) * 9).toFixed(2)}px`)
+        stage.style.setProperty('--depth-y', `${((y - 0.5) * 7).toFixed(2)}px`)
+        stage.style.setProperty('--depth-rotate-x', `${((0.5 - y) * 1.1).toFixed(2)}deg`)
+        stage.style.setProperty('--depth-rotate-y', `${((x - 0.5) * 1.5).toFixed(2)}deg`)
+        stage.style.setProperty('--spotlight-x', `${(x * 100).toFixed(1)}%`)
+        stage.style.setProperty('--spotlight-y', `${(y * 100).toFixed(1)}%`)
+      }
+
+      frame.addEventListener('pointerenter', () => stage.classList.add('is-depth-active'))
+      frame.addEventListener('pointermove', (event) => {
+        pendingPoint = { clientX: event.clientX, clientY: event.clientY }
+        if (!frameId) frameId = requestAnimationFrame(renderDepth)
+      })
+      frame.addEventListener('pointerleave', () => {
+        pendingPoint = null
+        if (frameId) cancelAnimationFrame(frameId)
+        frameId = 0
+        stage.classList.remove('is-depth-active')
+        ;[
+          '--depth-x',
+          '--depth-y',
+          '--depth-rotate-x',
+          '--depth-rotate-y',
+          '--spotlight-x',
+          '--spotlight-y'
+        ].forEach((property) => stage.style.removeProperty(property))
+      })
+    }
+
+    document.querySelectorAll('[data-download-shell]').forEach((shell) => {
+      shell.addEventListener('pointerenter', () => shell.classList.add('is-material-active'))
+      shell.addEventListener('pointermove', (event) => {
+        const rect = shell.getBoundingClientRect()
+        const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+        const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+        shell.style.setProperty('--material-x', `${(x * 100).toFixed(1)}%`)
+        shell.style.setProperty('--material-y', `${(y * 100).toFixed(1)}%`)
+      })
+      shell.addEventListener('pointerleave', () => {
+        shell.classList.remove('is-material-active')
+        shell.style.removeProperty('--material-x')
+        shell.style.removeProperty('--material-y')
+      })
+    })
   }
 
   function setupReveal() {
@@ -169,12 +243,15 @@
         setChoicePlatform(tab.dataset.platformTab, true)
       })
       tab.addEventListener('keydown', (event) => {
-        const tabs = Array.from(tab.closest('[role="tablist"]')?.querySelectorAll('[data-platform-tab]') || [])
+        const tabs = Array.from(
+          tab.closest('[role="tablist"]')?.querySelectorAll('[data-platform-tab]') || []
+        )
         const currentIndex = tabs.indexOf(tab)
         if (currentIndex < 0) return
         let nextIndex = currentIndex
         if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
-        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+        else if (event.key === 'ArrowLeft')
+          nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
         else if (event.key === 'Home') nextIndex = 0
         else if (event.key === 'End') nextIndex = tabs.length - 1
         else return
@@ -393,15 +470,20 @@
       tab.tabIndex = active ? 0 : -1
       tab.classList.toggle('current-platform', tab.dataset.platformTab === detected)
     })
+    document.querySelectorAll('.platform-tabs').forEach((tabList) => {
+      const tabs = Array.from(tabList.querySelectorAll('[data-platform-tab]'))
+      const activeIndex = Math.max(
+        0,
+        tabs.findIndex((tab) => tab.dataset.platformTab === selected)
+      )
+      const offsets = ['0px', 'calc(100% + 4px)', 'calc(200% + 8px)']
+      tabList.style.setProperty('--tab-offset', offsets[activeIndex] || offsets[0])
+    })
     document.querySelectorAll('[data-platform-group]').forEach((group) => {
       const active = group.dataset.platformGroup === selected
       group.hidden = !active
       group.setAttribute('aria-hidden', String(!active))
-      if (
-        active &&
-        animate &&
-        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ) {
+      if (active && animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         group.getAnimations?.().forEach((animation) => animation.cancel())
         group.animate(
           [
