@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { compareReleaseManifest } from './reconcile-release-manifest.mjs'
+import { compareReleaseManifest, inspectReleaseManifest } from './reconcile-release-manifest.mjs'
 
 function manifest({
   generatedAt,
@@ -45,4 +45,15 @@ test('rejects an existing same-tag manifest that points to different release dat
       ),
     /does not describe the same release assets/i
   )
+})
+
+test('reports a changed inactive release manifest for the promotion workflow to replace', () => {
+  const result = inspectReleaseManifest(
+    manifest(),
+    manifest({ r2Url: 'https://dl.qzonephoto.getgit.one/releases/v2.7.1/rebuilt/app.exe' })
+  )
+
+  assert.equal(result.matches, false)
+  assert.equal(result.candidate.tag, 'v2.7.1')
+  assert.equal(result.existing.tag, 'v2.7.1')
 })

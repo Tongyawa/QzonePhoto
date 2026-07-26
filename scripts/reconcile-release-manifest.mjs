@@ -1,15 +1,24 @@
 import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
-export function compareReleaseManifest(candidate, existing) {
+export function inspectReleaseManifest(candidate, existing) {
   const normalizedCandidate = normalizeManifest(candidate, 'candidate')
   const normalizedExisting = normalizeManifest(existing, 'existing')
-  if (JSON.stringify(normalizedCandidate) !== JSON.stringify(normalizedExisting)) {
+  return {
+    matches: JSON.stringify(normalizedCandidate) === JSON.stringify(normalizedExisting),
+    candidate: normalizedCandidate,
+    existing: normalizedExisting
+  }
+}
+
+export function compareReleaseManifest(candidate, existing) {
+  const result = inspectReleaseManifest(candidate, existing)
+  if (!result.matches) {
     throw new Error(
       'Existing versioned manifest does not describe the same release assets; create a new patch version instead.'
     )
   }
-  return normalizedExisting
+  return result.existing
 }
 
 function normalizeManifest(value, label) {
@@ -63,11 +72,16 @@ async function main() {
     })
   )
   if (!args.candidate || !args.existing) {
-    throw new Error('Usage: --candidate=<manifest.json> --existing=<manifest.json>')
+    throw new Error('Usage: --candidate=<manifest.json> --existing=<manifest.json> [--status]')
   }
   const [candidate, existing] = await Promise.all(
     [args.candidate, args.existing].map(async (file) => JSON.parse(await readFile(file, 'utf8')))
   )
+  if (Object.hasOwn(args, 'status')) {
+    const result = inspectReleaseManifest(candidate, existing)
+    console.log(result.matches ? 'match' : 'replace')
+    return
+  }
   compareReleaseManifest(candidate, existing)
   console.log('Existing versioned manifest matches the selected release assets.')
 }

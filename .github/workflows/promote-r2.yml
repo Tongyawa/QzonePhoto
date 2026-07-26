@@ -28,6 +28,7 @@ jobs:
       R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
       R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
       RELEASE_TAG: ${{ inputs.tag }}
+      R2_VERSIONED_REPLACEMENT: 'false'
       GH_TOKEN: ${{ github.token }}
       GH_REPO: 11273/QzonePhoto
     steps:
@@ -132,19 +133,78 @@ jobs:
             --artifacts=verified-assets --out="${candidate_manifest}" --tag="${RELEASE_TAG}" \
             --releasePath="${RELEASE_TAG}" --publicBaseUrl="${R2_PUBLIC_BASE_URL}" \
             --githubRepo="${GH_REPO}" --generatedAt="${RELEASE_PUBLISHED_AT}"
+          current_stable_tag=''
+          if aws s3api head-object --bucket "${R2_BUCKET}" --key 'manifests/latest.json' \
+            --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
+            aws s3 cp "s3://${R2_BUCKET}/manifests/latest.json" current-stable-manifest.json \
+              --endpoint-url "${R2_ENDPOINT}" --only-show-errors
+            current_stable_tag="$(node -e \"const value=require('./current-stable-manifest.json'); process.stdout.write(String(value.tag || ''))\")"
+            [[ "${current_stable_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              echo 'Existing stable R2 manifest has an invalid tag; refusing to replace versioned files.'
+              exit 1
+            }
+          fi
+          allow_inactive_release_replacement() {
+            if [ "${current_stable_tag}" = "${RELEASE_TAG}" ]; then
+              echo "${RELEASE_TAG} is already the stable R2 release and its published assets changed."
+              echo 'Create a new patch version instead of replacing files that active clients may be downloading.'
+              exit 1
+            fi
+            echo 'R2_VERSIONED_REPLACEMENT=true' >> "${GITHUB_ENV}"
+            {
+              echo '### Replacing an inactive R2 release copy'
+              echo
+              echo "- Release: \`${RELEASE_TAG}\`"
+              echo "- Current stable R2 release: \`${current_stable_tag:-none}\`"
+              echo '- The selected release is not in the live stable channel, so its incomplete or superseded versioned files may be safely rebuilt and verified.'
+            } >> "${GITHUB_STEP_SUMMARY}"
+          }
+          versioned_object_count="$(aws s3api list-objects-v2 --bucket "${R2_BUCKET}" \
+            --prefix "releases/${RELEASE_TAG}/" --max-keys 1 --endpoint-url "${R2_ENDPOINT}" \
+            --query 'KeyCount' --output text)"
+          existing_versioned_manifest=false
           if aws s3api head-object --bucket "${R2_BUCKET}" --key "${manifest_key}" \
             --endpoint-url "${R2_ENDPOINT}" >/dev/null 2>&1; then
+            existing_versioned_manifest=true
+          fi
+          if [ "${current_stable_tag}" != "${RELEASE_TAG}" ] && \
+            { [ "${versioned_object_count}" != '0' ] || [ "${existing_versioned_manifest}" = true ]; }; then
+            # The selected tag is not live. Any old objects are only a failed attempt or an
+            # earlier verification build, so rebuild the complete release rather than letting a
+            # stale manifest, metadata file, blockmap, or installer fail one-by-one later.
+            mv "${candidate_manifest}" "artifacts/${RELEASE_TAG}.json"
+            echo "Found an inactive R2 copy of ${RELEASE_TAG}; rebuilding it from verified GitHub assets."
+            allow_inactive_release_replacement
+          elif [ "${existing_versioned_manifest}" = true ]; then
             aws s3 cp "s3://${R2_BUCKET}/${manifest_key}" existing-release-manifest.json \
               --endpoint-url "${R2_ENDPOINT}" --only-show-errors
-            node scripts/reconcile-release-manifest.mjs \
-              --candidate="${candidate_manifest}" --existing=existing-release-manifest.json
-            # `generatedAt` records the first promotion time only. Reuse a semantically identical
-            # immutable manifest byte-for-byte instead of failing a same-release retry on timestamp.
-            cp existing-release-manifest.json "artifacts/${RELEASE_TAG}.json"
-            echo "Reused the existing immutable manifest for ${RELEASE_TAG}."
+            manifest_state="$(node scripts/reconcile-release-manifest.mjs \
+              --candidate="${candidate_manifest}" --existing=existing-release-manifest.json \
+              --status)"
+            case "${manifest_state}" in
+              match)
+                # `generatedAt` records the first promotion time only. Reuse a semantically
+                # identical immutable manifest byte-for-byte on an unchanged retry.
+                cp existing-release-manifest.json "artifacts/${RELEASE_TAG}.json"
+                echo "Reused the existing immutable manifest for ${RELEASE_TAG}."
+                ;;
+              replace)
+                echo "${RELEASE_TAG} is already the stable R2 release and its published assets changed."
+                echo 'Create a new patch version instead of replacing files that active clients may be downloading.'
+                exit 1
+                ;;
+              *)
+                echo "Unexpected manifest reconciliation result: ${manifest_state}"
+                exit 1
+                ;;
+            esac
+          elif [ "${current_stable_tag}" = "${RELEASE_TAG}" ]; then
+            echo "${RELEASE_TAG} is the current stable R2 release, but its versioned manifest is missing."
+            echo 'Refusing to repair a live release in place; create a new patch version instead.'
+            exit 1
           else
-            echo "No prior R2 copy of ${RELEASE_TAG}; this is the first promotion for the tag."
             mv "${candidate_manifest}" "artifacts/${RELEASE_TAG}.json"
+            echo "No prior R2 copy of ${RELEASE_TAG}; this is the first promotion for the tag."
           fi
 
       - name: Prevent stable channel rollback
@@ -237,6 +297,11 @@ jobs:
                   return 1
                 }
                 echo "Verified legacy immutable object bytes; repairing its metadata: ${key}"
+                upload_and_verify "${file}" "${key}" "${cache_control}" "${content_type}"
+                return
+              fi
+              if [ "${R2_VERSIONED_REPLACEMENT}" = 'true' ]; then
+                echo "Replacing inactive versioned release object: ${key}"
                 upload_and_verify "${file}" "${key}" "${cache_control}" "${content_type}"
                 return
               fi
@@ -339,7 +404,7 @@ jobs:
             echo
             echo "- Release: \`${RELEASE_TAG}\`"
             echo '- Versioned assets were uploaded once and verified by size plus SHA-512 metadata.'
-            echo '- Re-running an unchanged tag is idempotent; changed published assets are rejected.'
+            echo '- Re-running an unchanged tag is idempotent. A changed tag may replace only an inactive R2 release; a live stable tag remains immutable.'
             echo '- All three updater pointers were switched before the website manifest, then the public domain was audited.'
             echo '- If the final public audit fails, the previous stable pointers are restored automatically.'
           } >> "${GITHUB_STEP_SUMMARY}"
